@@ -47,7 +47,7 @@ def ray_box(origin, dirs, center, size, yaw):
 
 
 def simulate_scan(objects, channels=32, sensor_h=1.8, max_range=80.0,
-                  az_res=0.4, noise_m=0.02, dropout=0.05, walls=(14.0, -12.0), seed=0):
+                  az_res=0.4, noise_m=0.02, dropout=0.05, walls=(22.0, -16.0), seed=0):
     """Satu putaran (sweep) LiDAR. objects: list dict {xyz, lwh, yaw, cls}."""
     rng = np.random.default_rng(seed)
     dirs, ring = beam_directions(channels, az_res=az_res)

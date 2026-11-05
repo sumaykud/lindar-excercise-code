@@ -377,7 +377,7 @@ python detect_and_lift.py --video burleigh.mp4 --model efficientdet_lite2.tflite
 python lidar_sim.py &amp;&amp; python pointcloud_ops.py
 python pointnet.py --epochs 8
 python pointpillars.py --steps 400
-python cli_view.py --t 16.0 --channels 32</pre>
+python cli_view.py --t 10.0 --channels 32</pre>
         <p class="note" style="margin-top:10px">Model EfficientDet-Lite2 (.tflite) diunduh dari katalog model MediaPipe. Semua skrip membaca/menulis folder <span class="mono">data/</span>.</p>
       </div>
     </div>
@@ -575,7 +575,14 @@ function simulateScan(st, channels) {
   const t0 = performance.now(), s = egoS(st.t), prims = [];
   // dynamic objects from the video
   st.objects.forEach((o, i) => prims.push({ k: 'box', kind: 10 + i, id: o.id, cls: o.cls, x: o.xyz[0], y: o.xyz[1], z: o.xyz[2], l: o.lwh[0], w: o.lwh[1], h: o.lwh[2], yaw: o.yaw, refl: 0.62 }));
-  for (const p of ENV) { const x = p.x - s; if (x > -70 && x < 100) prims.push({ ...p, x }); }
+  // synthetic scenery makes room for real detections (e.g. pedestrians on the sidewalk)
+  const ground = st.objects.filter(o => o.cls !== 'traffic light');
+  for (const p of ENV) {
+    const x = p.x - s; if (x < -70 || x > 100) continue;
+    const ex = p.k === 'box' ? p.l / 2 : p.r, ey = p.k === 'box' ? p.w / 2 : p.r;
+    if (p.kind !== 4 && ground.some(o => Math.abs(o.xyz[0] - x) < ex + o.lwh[0] / 2 + 0.4 && Math.abs(o.xyz[1] - p.y) < ey + o.lwh[1] / 2 + 0.4)) continue;
+    prims.push({ ...p, x });
+  }
   const nAz = Math.round(360 / AZ_RES[channels]), azStep = 2 * Math.PI / nAz;
   // precompute local-frame ray origin + azimuth span for culling
   const buckets = Array.from({ length: nAz }, () => []);
@@ -738,7 +745,9 @@ function labelPool(host) {
       el.style.display = ''; pos[used] = [x, y]; used++; },
     end() {
       // greedy de-overlap: nearest (lowest on screen) keeps its spot, others move up
-      const items = []; for (let i = 0; i < used; i++) items.push({ el: els[i], x: pos[i][0], y: pos[i][1], w: els[i].offsetWidth, h: els[i].offsetHeight });
+      const HW = host.clientWidth, items = [];
+      for (let i = 0; i < used; i++) { const w = els[i].offsetWidth;   // keep labels inside the frame
+        items.push({ el: els[i], x: clamp(pos[i][0], w / 2 + 4, Math.max(w / 2 + 4, HW - w / 2 - 4)), y: pos[i][1], w, h: els[i].offsetHeight }); }
       items.sort((a, b) => b.y - a.y); const placed = [];
       for (const it of items) {
         for (let k = 0; k < 12; k++) {

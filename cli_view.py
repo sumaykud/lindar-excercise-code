@@ -1,7 +1,7 @@
 """
 cli_view.py — lihat point cloud LiDAR langsung di terminal (tampak atas / BEV).
 
-  python cli_view.py --t 16.0 --channels 32
+  python cli_view.py --t 10.0 --channels 32
 
 Simbol:  ·  jalan     : - = + * #  kepadatan titik non-jalan     ▣  pusat objek
 """
@@ -50,7 +50,7 @@ def render(pts, ground, objs, cols=64, rows=26, x_max=48.0, y_half=18.0):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--t", type=float, default=16.0)
+    ap.add_argument("--t", type=float, default=10.0)
     ap.add_argument("--channels", type=int, default=32)
     a = ap.parse_args()
     data = json.load(open("data/tracks.json"))

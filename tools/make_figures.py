@@ -58,9 +58,9 @@ img = img[200:720, :]
 cv2.imwrite(f"{OUT}/fig_volume.jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 88])
 
 # ---- BEV of the simulated scan (turbo colour by height) ----
-fr = max(d["frames"], key=lambda f: sum(1 for o in f["objects"] if o["xyz"][0] < 32 and o["cls"] != "traffic light"))
+fr = min(d["frames"], key=lambda f: abs(f["t"] - 10.6))     # pejalan kaki + mobil dalam satu frame
 pts, lab, ring = simulate_scan(fr["objects"], channels=64, az_res=0.2)
-S, R = 900, 34.0                       # pixels, metres shown in front
+S, R = 900, 40.0                       # pixels, metres shown in front
 bev = np.full((S, S, 3), (30, 22, 14), np.uint8)
 sc = S / (R * 1.25)
 def to_px(x, y): return int(S / 2 - y * sc), int(S * 0.82 - x * sc)

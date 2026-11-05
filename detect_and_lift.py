@@ -109,7 +109,9 @@ def lift_to_3d(box, cls, v0):
     # Isyarat 2: titik kontak dengan jalan (asumsi jalan datar)
     #            Z = f * tinggi_kamera / (v_bawah - v_horizon)
     z_ground = None
-    if cls != "traffic light" and not trunc_bottom and (y2 - v0) > 8:
+    # Pejalan kaki berdiri di trotoar (lebih tinggi dari jalan) dan kakinya dekat
+    # horizon, di mana galat 1 px = >1 m. Asumsi jalan datar tidak berlaku -> pakai tinggi saja.
+    if cls not in ("traffic light", "person") and not trunc_bottom and (y2 - v0) > 8:
         z_ground = FY * CAM_HEIGHT / (y2 - v0)
 
     if z_ground is not None and not trunc_side:
@@ -191,9 +193,13 @@ def main():
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         ts = int(f * 1000 / fps)
         dets = []
-        # Deteksi di 3 potongan (kiri, tengah, kanan) + frame penuh agar objek
-        # kecil di kejauhan tetap terdeteksi oleh input 448x448 model.
-        crops = [(0, 0, W, H), (0, 120, 720, 600), (280, 120, 1000, 600), (560, 120, 1280, 600)]
+        # Frame penuh + 5 potongan agar objek kecil tetap terdeteksi oleh input 448x448:
+        #   3 potongan pita jalan (kiri, tengah, kanan) untuk kendaraan jauh,
+        #   2 potongan bawah-kiri/kanan untuk pejalan kaki di trotoar (kaki mereka
+        #   ada di bawah y=600, jadi terpotong oleh pita jalan dan dibuang).
+        crops = [(0, 0, W, H), (0, 120, 720, 600), (280, 120, 1000, 600), (560, 120, 1280, 600),
+                 (0, 360, 360, 720), (920, 360, 1280, 720)]
+        SIDEWALK = crops[4:]                     # potongan khusus pejalan kaki
         for (cx0, cy0, cx1, cy1) in crops:
             sub = np.ascontiguousarray(rgb[cy0:cy1, cx0:cx1])
             img = mp.Image(image_format=mp.ImageFormat.SRGB, data=sub)
@@ -201,6 +207,8 @@ def main():
             res = video_det.detect_for_video(img, ts) if full else crop_det.detect(img)
             for d in res.detections:
                 c = d.categories[0]; bb = d.bounding_box
+                if (cx0, cy0, cx1, cy1) in SIDEWALK and c.category_name != "person":
+                    continue
                 box = [bb.origin_x + cx0, bb.origin_y + cy0,
                        bb.origin_x + bb.width + cx0, bb.origin_y + bb.height + cy0]
                 if c.score < MIN_SCORE[c.category_name]:

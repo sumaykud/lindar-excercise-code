@@ -31,7 +31,7 @@ video kamera ──► deteksi 2D (EfficientDet-Lite2, MediaPipe)
 | `pointpillars.py` | PointPillars ringkas: Pillar Feature Net, scatter, backbone 2D, SSD head, focal loss, NMS. |
 | `cli_view.py` | Tampilan tampak atas (BEV) ASCII di terminal + tabel jarak, l×w×h, volume, jumlah titik. |
 | `data/` | `tracks.json` hasil deteksi + log asli dari setiap skrip. |
-| `web/` | Demo interaktif three.js (video + volume 3D, viewport LiDAR, kode, log CLI, edukasi + PDF). |
+| `web/` | Demo interaktif three.js (video + volume 3D, viewport LiDAR, kode, log CLI, edukasi + PDF). `serve.py` = server lokal. |
 | `tools/` | Skrip untuk membuat gambar dan PDF ringkasan (`web/lidar-edukasi.pdf`). |
 
 ## Mulai cepat
@@ -62,7 +62,7 @@ python pointpillars.py --steps 400
 ```
 
 ```bash
-python cli_view.py --t 16.0 --channels 32
+python cli_view.py --t 10.0 --channels 32
 ```
 
 `detect_and_lift.py` mengasumsikan kamera 1280×720, FOV horizontal ±78°, tinggi 1,4 m. Ubah konstanta di bagian atas
@@ -72,11 +72,15 @@ file untuk video lain. Semua langkah jalan di CPU; GPU tidak wajib.
 
 | Langkah | Hasil | Catatan |
 |---|---|---|
-| Deteksi + tracking | 346 frame (15 fps), 25 objek terlacak | dicek visual: kotak 3D jatuh di atas mobil |
+| Deteksi + tracking | 346 frame (15 fps), 34 objek terlacak: 21 mobil, 10 pejalan kaki, 3 lampu lalu lintas | dicek visual: kotak 3D jatuh di atas mobil dan pejalan kaki |
 | PointNet, 8 epoch | akurasi uji 100% | data sintetis yang mudah; hanya membuktikan kode berjalan |
-| PointPillars, 400 langkah CPU (±3 menit) | precision 0,92 · recall 0,90 | optimis: data latih dan uji dari jalan simulasi yang sama |
+| PointPillars, 400 langkah CPU (±4 menit) | precision 0,72 · recall 0,92 | data latih dan uji dari jalan simulasi yang sama; latihan sangat singkat |
 
 Galat jarak monokular diperkirakan ±15–25% pada 30 m (perkiraan, tidak diukur karena tidak ada ground truth).
+
+Pejalan kaki di trotoar terlihat di pojok bawah frame. Karena itu `detect_and_lift.py` menjalankan dua potongan
+tambahan (bawah-kiri dan bawah-kanan) khusus kelas *person*, dan jarak pejalan kaki dihitung dari tinggi tubuh saja:
+trotoar lebih tinggi dari jalan, jadi asumsi jalan datar tidak berlaku.
 
 ## Demo web (three.js)
 
@@ -87,10 +91,11 @@ python web/build.py
 ```
 
 ```bash
-python -m http.server 8000 -d web
+python web/serve.py
 ```
 
-Buka `http://localhost:8000/standalone.html`. Untuk hasil yang cocok dengan video lain, jalankan dulu
+Buka `http://localhost:8000/standalone.html`. Pakai `web/serve.py`, bukan `python -m http.server`: server bawaan
+Python tidak mendukung HTTP Range, sehingga video tidak bisa di-seek dan timeline macet di 0 s. Untuk hasil yang cocok dengan video lain, jalankan dulu
 `detect_and_lift.py` pada video tersebut. `web/index.html` adalah versi fragmen untuk Claude Artifact.
 Library three.js, Prism, dan pdf.js dimuat dari CDN (jsDelivr/cdnjs).
 

@@ -1,10 +1,10 @@
 $ python lidar_sim.py
-frame t=20.2s  objek=6
-point cloud: (26224, 4)  x[-79.9,79.2]  titik-objek=1006
+frame t=9.8s  objek=9
+point cloud: (25699, 4)  x[-79.9,79.9]  titik-objek=165
 ToF  10 m ->    66.7 ns
 ToF  50 m ->   333.6 ns
 ToF 200 m ->  1334.3 ns
 $ python pointcloud_ops.py
-total=26224  ground=15169  non-ground=11055
-voxel 0.2 m: 11055 -> 9308 titik
-pillars: (1865, 32, 9)  rata-rata titik/pillar=6.8
+total=25699  ground=16825  non-ground=8874
+voxel 0.2 m: 8874 -> 8322 titik
+pillars: (2447, 32, 9)  rata-rata titik/pillar=5.1
