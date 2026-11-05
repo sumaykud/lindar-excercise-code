@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# hasil latih / data besar yang bisa dibuat ulang
+*.pt
+*.npy
+*.tflite
+
+# video tidak disertakan (lihat README > Lisensi)
+*.mp4
+
+# folder kerja tools/make_pdf.py
+work/

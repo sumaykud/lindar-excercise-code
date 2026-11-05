@@ -1,0 +1,15 @@
+[video] burleigh.mp4  1280x720 @ 30 fps, 691 frame
+[kamera] fx=790.3px  HFOV=78.0°  tinggi=1.4 m
+[frame 0000/691] t= 0.00s  deteksi= 1  track_aktif= 0  horizon_v0=600.0px  ( 1.8 it/s)
+[frame 0060/691] t= 2.00s  deteksi= 3  track_aktif= 3  horizon_v0=600.0px  ( 2.1 it/s)
+[frame 0120/691] t= 4.00s  deteksi= 2  track_aktif= 2  horizon_v0=600.0px  ( 2.1 it/s)
+[frame 0180/691] t= 6.00s  deteksi= 2  track_aktif= 2  horizon_v0=605.6px  ( 2.1 it/s)
+[frame 0240/691] t= 8.00s  deteksi= 4  track_aktif= 4  horizon_v0=606.5px  ( 2.2 it/s)
+[frame 0300/691] t=10.00s  deteksi= 5  track_aktif= 4  horizon_v0=597.5px  ( 2.2 it/s)
+[frame 0360/691] t=12.00s  deteksi= 3  track_aktif= 3  horizon_v0=600.1px  ( 2.1 it/s)
+[frame 0420/691] t=14.00s  deteksi= 3  track_aktif= 3  horizon_v0=603.0px  ( 2.1 it/s)
+[frame 0480/691] t=16.00s  deteksi= 3  track_aktif= 3  horizon_v0=600.9px  ( 2.1 it/s)
+[frame 0540/691] t=18.00s  deteksi= 3  track_aktif= 3  horizon_v0=600.9px  ( 2.2 it/s)
+[frame 0600/691] t=20.00s  deteksi= 5  track_aktif= 5  horizon_v0=584.8px  ( 2.2 it/s)
+[frame 0660/691] t=22.00s  deteksi= 4  track_aktif= 3  horizon_v0=582.2px  ( 2.2 it/s)
+[selesai] 346 frame, 1161 deteksi, 25 track unik -> data/tracks.json (160.7s)

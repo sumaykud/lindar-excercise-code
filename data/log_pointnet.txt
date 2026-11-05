@@ -1,0 +1,17 @@
+$ python pointnet.py --epochs 8
+[data] latih=(600, 256, 3)  uji=(160, 256, 3)  (5.6s)
+[model] PointNetCls  parameter=98,253
+[epoch 01/8] loss=0.5691  akurasi_uji= 38.1%
+[epoch 02/8] loss=0.1992  akurasi_uji= 96.2%
+[epoch 03/8] loss=0.1135  akurasi_uji= 98.1%
+[epoch 04/8] loss=0.0717  akurasi_uji=100.0%
+[epoch 05/8] loss=0.0621  akurasi_uji= 98.8%
+[epoch 06/8] loss=0.0542  akurasi_uji= 99.4%
+[epoch 07/8] loss=0.0426  akurasi_uji=100.0%
+[epoch 08/8] loss=0.0435  akurasi_uji=100.0%
+[confusion matrix] baris=label, kolom=prediksi     car  truck person   pole
+      car     40      0      0      0
+    truck      0     40      0      0
+   person      0      0     40      0
+     pole      0      0      0     40
+[selesai] model -> data/pointnet_cls.pt  (14.5s)

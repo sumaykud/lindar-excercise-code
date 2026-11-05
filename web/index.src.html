@@ -1,0 +1,1240 @@
+<title>Burleigh LiDAR Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Demo edukasi LiDAR: volume objek 3D di video jalan Burleigh Heads, kode Python (NumPy, PyTorch, PointNet, PointPillars), log CLI, dan ringkasan PDF.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;1,400&family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: sensor console. Sticky header with tabs; Demo = video+volume overlay beside the LiDAR viewport,
+   a full-width transport/timeline strip, then object table + sensor settings. Viewports stay dark in both themes. */
+:root {
+  --bg: #edf1f4; --surface: #ffffff; --surface-2: #e3e9ee; --line: #cdd6de; --fg: #111923; --muted: #586677;
+  --accent: #a85f00; --accent-ink: #ffffff; --accent-soft: #f6e6cf; --vol: #0b7f92;
+  --vp-bg: #0a1018; --vp-panel: #101925; --vp-line: #1f2b3a; --vp-fg: #dde6ee; --vp-muted: #8496aa;
+  --c-car: #46d2e6; --c-truck: #7fa8ff; --c-person: #ff7d93; --c-light: #7be08f; --c-other: #f2c46b; --c-sel: #f4a83a;
+  --good: #1f8a4c; --warn: #b5520b;
+  --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-body: "Barlow", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --r: 10px; --r-sm: 6px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #090e14; --surface: #0f1720; --surface-2: #16202b; --line: #233041; --fg: #e2e9f0; --muted: #8b9bb0;
+  --accent: #f4a83a; --accent-ink: #1b1205; --accent-soft: #2e2213; --vol: #46d2e6; --good: #4cc27f; --warn: #f08a4b;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #090e14; --surface: #0f1720; --surface-2: #16202b; --line: #233041; --fg: #e2e9f0; --muted: #8b9bb0;
+  --accent: #f4a83a; --accent-ink: #1b1205; --accent-soft: #2e2213; --vol: #46d2e6; --good: #4cc27f; --warn: #f08a4b;
+  color-scheme: dark; }
+
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--fg); }
+body { font-family: var(--font-body); font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--surface); }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 600; text-wrap: balance; margin: 0; letter-spacing: .01em; }
+p { margin: 0; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mono { font-family: var(--font-mono); }
+.mono, pre, code, .term-out, .stat .v, .formula, .shape, .chip, .seg button, .time { font-variant-ligatures: none; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---------- header ---------- */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--surface); border-bottom: 1px solid var(--line); }
+.top-in { max-width: 1480px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; align-items: center; gap: 12px 28px; flex-wrap: wrap; padding-block: 10px; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand svg { flex: none; }
+.brand-name { font-family: var(--font-display); font-size: 22px; font-weight: 700; letter-spacing: .02em; line-height: 1; }
+.brand-sub { font-size: 12px; color: var(--muted); line-height: 1.2; margin-top: 3px; }
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-left: auto; }
+.tab { appearance: none; border: 1px solid transparent; background: none; padding: 7px 13px; border-radius: 999px; cursor: pointer;
+  font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: .03em; color: var(--muted); text-decoration: none; }
+.tab:hover { color: var(--fg); background: var(--surface-2); }
+.tab[aria-selected="true"] { color: var(--accent-ink); background: var(--accent); }
+.tab .k { font-family: var(--font-mono); font-size: 11px; opacity: .7; margin-left: 4px; font-weight: 400; }
+
+.wrap { max-width: 1480px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 18px 40px; }
+.view-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 24px; margin-bottom: 14px; }
+.view-head h1 { font-size: clamp(24px, 3.2vw, 34px); line-height: 1.05; }
+.view-head p { color: var(--muted); max-width: 70ch; margin-top: 4px; }
+.eyebrow { font-family: var(--font-display); font-size: 13px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+.badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; padding: 5px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--fg); border: 1px solid var(--line); }
+.badge b { color: var(--accent); font-weight: 600; }
+
+/* ---------- demo grid ---------- */
+.stage { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr); gap: 12px; }
+.vp { position: relative; background: var(--vp-bg); color: var(--vp-fg); border-radius: var(--r); overflow: hidden; min-width: 0; }
+.vp-bar { position: absolute; inset: 0 0 auto 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; z-index: 4;
+  background: linear-gradient(to bottom, rgba(6,10,16,.78), rgba(6,10,16,0)); pointer-events: none; }
+.vp-title { font-family: var(--font-display); font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.vp-title small { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0; text-transform: none; color: #b9c7d5; margin-left: 6px; font-weight: 400; }
+.vp-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 10px; background: var(--vp-panel); border-top: 1px solid var(--vp-line); }
+.vp-tools .lab { font-family: var(--font-mono); font-size: 11px; color: var(--vp-muted); margin-right: 2px; }
+.video-box { position: relative; aspect-ratio: 16 / 9; width: 100%; max-width: 100%; }
+.video-box video, .video-box canvas, .layer { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.video-box video { object-fit: fill; background: #000; }
+.layer { pointer-events: none; }
+.stage > .vp { display: flex; flex-direction: column; }
+.lidar-box { position: relative; flex: 1 1 auto; min-height: 280px; width: 100%; max-width: 100%; }
+.lidar-box canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.lbl { position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); white-space: nowrap; font-family: var(--font-mono); font-size: 11px; line-height: 1.25;
+  padding: 2px 6px; border-radius: 4px; background: rgba(8,13,20,.82); color: #eef4f8; border-left: 3px solid var(--c, var(--c-car)); pointer-events: none; }
+.lbl b { font-weight: 600; color: var(--c, var(--c-car)); }
+.lbl.sel { background: var(--c-sel); color: #1b1205; border-left-color: #1b1205; }
+.lbl.sel b { color: #1b1205; }
+.ring-lbl { position: absolute; transform: translate(-50%, -50%); font-family: var(--font-mono); font-size: 10px; color: var(--vp-muted); pointer-events: none; }
+.vp-foot { position: absolute; inset: auto 0 0 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 10px; z-index: 4;
+  font-family: var(--font-mono); font-size: 11px; color: var(--vp-muted); background: linear-gradient(to top, rgba(6,10,16,.8), rgba(6,10,16,0)); pointer-events: none; flex-wrap: wrap; }
+.scale { display: inline-flex; align-items: center; gap: 6px; }
+.scale i { display: inline-block; width: 110px; height: 8px; border-radius: 2px; background: linear-gradient(90deg, #30123b, #4662d7, #36aaf9, #1ae4b6, #72fe5e, #c8ef34, #faba39, #f66b19, #ca2a04, #7a0403); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip { appearance: none; cursor: pointer; border: 1px solid rgba(132,150,170,.45); background: rgba(10,16,24,.6); color: var(--vp-fg); border-radius: 999px;
+  font-family: var(--font-mono); font-size: 11px; padding: 3px 9px; line-height: 1.4; }
+.chip[aria-pressed="true"] { background: var(--c-car); color: #062027; border-color: var(--c-car); }
+.chip:hover { border-color: var(--vp-fg); }
+
+/* transport */
+.transport { margin-top: 12px; display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: 10px 14px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; }
+.btn { appearance: none; cursor: pointer; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); border-radius: var(--r-sm);
+  padding: 7px 12px; font-family: var(--font-display); font-size: 15px; font-weight: 600; letter-spacing: .03em; display: inline-flex; align-items: center; gap: 7px; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn svg { width: 14px; height: 14px; }
+.time { font-family: var(--font-mono); font-size: 13px; white-space: nowrap; }
+.time span { color: var(--muted); }
+.tl { position: relative; height: 46px; min-width: 0; cursor: pointer; touch-action: none; }
+.tl canvas { width: 100%; height: 100%; display: block; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
+.seg button { appearance: none; border: 0; background: var(--surface); padding: 6px 10px; cursor: pointer; font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+
+.below { margin-top: 12px; display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr); gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; min-width: 0; }
+.card h2 { font-size: 20px; }
+.card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.card-head .meta { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.tbl-wrap { overflow-x: auto; }
+table.objs { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+table.objs th { text-align: left; font-family: var(--font-display); font-weight: 600; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+  border-bottom: 1.5px solid var(--fg); padding: 6px 8px; white-space: nowrap; }
+table.objs td { padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; font-variant-numeric: tabular-nums; }
+table.objs td.r, table.objs th.r { text-align: right; }
+table.objs tbody tr { cursor: pointer; }
+table.objs tbody tr:hover td { background: var(--surface-2); }
+table.objs tbody tr.sel td { background: var(--accent-soft); }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 7px; vertical-align: 0; background: var(--c); }
+.bar { display: inline-block; height: 6px; border-radius: 3px; background: var(--vol); vertical-align: middle; margin-left: 6px; opacity: .8; }
+.empty { color: var(--muted); padding: 14px 4px; font-size: 14px; }
+.detail { margin-top: 12px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 14px; align-items: center; border-top: 1px solid var(--line); padding-top: 12px; }
+.detail h3 { font-size: 19px; }
+.detail .eq { font-family: var(--font-mono); font-size: 12.5px; margin-top: 6px; color: var(--muted); }
+.detail .eq b { color: var(--fg); font-weight: 600; }
+.spark { width: 100%; height: 86px; display: block; }
+
+.settings { display: grid; gap: 12px; }
+.row { display: grid; grid-template-columns: 110px minmax(0, 1fr); align-items: center; gap: 10px; }
+.row > label, .row > .lab { font-family: var(--font-display); font-weight: 600; letter-spacing: .05em; text-transform: uppercase; font-size: 13px; color: var(--muted); }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.stat { background: var(--surface-2); border-radius: var(--r-sm); padding: 8px 10px; min-width: 0; }
+.stat .v { font-family: var(--font-mono); font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat .k { font-size: 11.5px; color: var(--muted); line-height: 1.25; }
+.explain { display: grid; gap: 8px; font-size: 14px; }
+.explain p { padding-left: 14px; position: relative; }
+.explain p::before { content: ""; position: absolute; left: 0; top: .6em; width: 6px; height: 6px; background: var(--accent); border-radius: 1px; }
+.note { font-size: 13px; color: var(--muted); border-left: 3px solid var(--accent); padding: 4px 0 4px 10px; }
+
+/* ---------- code ---------- */
+.code-grid { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 12px; align-items: start; }
+.files { display: grid; gap: 6px; position: sticky; top: 76px; }
+.file { appearance: none; text-align: left; cursor: pointer; border: 1px solid var(--line); background: var(--surface); border-radius: var(--r-sm); padding: 9px 11px; }
+.file .n { font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
+.file .d { font-size: 12.5px; color: var(--muted); line-height: 1.35; margin-top: 2px; }
+.file .tags { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+.file .tags span { font-family: var(--font-mono); font-size: 10.5px; padding: 1px 6px; border-radius: 3px; background: var(--surface-2); color: var(--muted); }
+.file[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.codebox { background: var(--vp-bg); color: var(--vp-fg); border-radius: var(--r); overflow: hidden; min-width: 0; }
+.codebar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--vp-line); flex-wrap: wrap; }
+.codebar .path { font-family: var(--font-mono); font-size: 12.5px; color: var(--vp-muted); }
+.codebar .path b { color: var(--vp-fg); font-weight: 600; }
+.codebar .btn { background: var(--vp-panel); color: var(--vp-fg); border-color: var(--vp-line); font-size: 13px; padding: 5px 10px; }
+.codescroll { overflow: auto; max-height: 72vh; }
+pre.code { margin: 0; padding: 14px 0; font-family: var(--font-mono); font-size: 12.8px; line-height: 1.62; counter-reset: ln; tab-size: 4; }
+pre.code .ln { display: block; padding: 0 16px 0 0; white-space: pre; }
+pre.code .ln::before { counter-increment: ln; content: counter(ln); display: inline-block; width: 46px; padding-right: 14px; text-align: right; color: #4b5b6e; user-select: none; }
+.token.comment, .token.prolog { color: #7d8fa3; font-style: italic; }
+.token.string, .token.triple-quoted-string { color: #9bdc8a; }
+.token.keyword, .token.builtin { color: #ff9e64; }
+.token.function { color: #7cc7ff; }
+.token.number, .token.boolean { color: #f5c76a; }
+.token.operator, .token.punctuation { color: #aab8c6; }
+.token.decorator, .token.class-name { color: #e7a6ff; }
+.howto { margin-top: 12px; }
+.howto pre { margin: 8px 0 0; background: var(--surface-2); border-radius: var(--r-sm); padding: 10px 12px; font-family: var(--font-mono); font-size: 12.5px; overflow-x: auto; }
+
+/* ---------- cli ---------- */
+.cli-grid { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 12px; align-items: start; }
+.chapters { display: grid; gap: 6px; }
+.chap { appearance: none; text-align: left; cursor: pointer; border: 1px solid var(--line); background: var(--surface); border-radius: var(--r-sm); padding: 8px 11px; display: grid; grid-template-columns: 26px 1fr; gap: 2px 6px; align-items: baseline; }
+.chap .i { font-family: var(--font-mono); font-size: 12px; color: var(--muted); grid-row: span 2; }
+.chap .t { font-family: var(--font-display); font-weight: 600; font-size: 15.5px; letter-spacing: .02em; }
+.chap .s { font-size: 12px; color: var(--muted); }
+.chap[aria-current="true"] { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.chap.done .i { color: var(--good); }
+.term { background: #070b10; color: #cfd9e3; border-radius: var(--r); overflow: hidden; border: 1px solid #1a2431; min-width: 0; }
+.term-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #0d141c; border-bottom: 1px solid #1a2431; flex-wrap: wrap; }
+.term-bar .dots { display: flex; gap: 6px; } .term-bar .dots i { width: 10px; height: 10px; border-radius: 50%; background: #2a3746; display: block; }
+.term-bar .ttl { font-family: var(--font-mono); font-size: 12px; color: #8496aa; margin-right: auto; }
+.term-bar .btn { background: #131c26; color: #cfd9e3; border-color: #243142; font-size: 13px; padding: 4px 10px; }
+.term-out { margin: 0; padding: 14px 16px 18px; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.55; white-space: pre; overflow: auto; height: min(68vh, 640px); }
+.t-ps { color: #f4a83a; } .t-cmd { color: #ffffff; } .t-tag { color: #46d2e6; } .t-val { color: #f5c76a; } .t-dim { color: #5b6b7d; }
+.t-ok { color: #7be08f; } .t-warn { color: #ff9e64; } .t-obj { color: #f4a83a; font-weight: 600; } .t-ego { color: #ffffff; } .t-den { color: #46d2e6; } .t-den2 { color: #7fa8ff; }
+.caret { display: inline-block; width: 8px; height: 1.1em; background: #cfd9e3; vertical-align: -2px; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ---------- edukasi ---------- */
+.edu-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.edu-col { display: grid; gap: 14px; min-width: 0; }
+.lesson { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; min-width: 0; }
+.lesson h2 { font-size: 22px; margin-top: 2px; }
+.lesson > p { color: var(--muted); margin-top: 4px; max-width: 68ch; }
+.lesson canvas { width: 100%; display: block; border-radius: var(--r-sm); background: var(--vp-bg); margin-top: 12px; }
+.ctrl { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px 18px; margin-top: 12px; }
+.ctrl label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.ctrl label span b { color: var(--fg); font-family: var(--font-mono); font-weight: 600; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.readout { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-top: 12px; }
+.formula { font-family: var(--font-mono); font-size: 15px; background: var(--surface-2); border-radius: var(--r-sm); padding: 9px 12px; margin-top: 10px; overflow-x: auto; white-space: nowrap; }
+.steps { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.step { appearance: none; cursor: pointer; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 5px 11px; font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
+.step .n { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.step[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.step[aria-pressed="true"] .n { color: var(--bg); opacity: .7; }
+.step-info { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 14px; align-items: start; margin-top: 10px; }
+.step-info h3 { font-size: 18px; }
+.step-info p { font-size: 14px; color: var(--muted); grid-column: 1 / -1; max-width: 70ch; }
+.shape { font-family: var(--font-mono); font-size: 12px; background: var(--accent-soft); border: 1px solid var(--line); padding: 3px 8px; border-radius: 4px; white-space: nowrap; }
+table.cmp { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 13.5px; margin-top: 10px; }
+table.cmp th, table.cmp td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.cmp th { font-family: var(--font-display); font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border-bottom: 1.5px solid var(--fg); }
+table.cmp td:first-child { font-weight: 600; white-space: nowrap; }
+.lvl { display: inline-block; width: 34px; height: 6px; border-radius: 3px; background: var(--surface-2); position: relative; margin-right: 6px; vertical-align: middle; overflow: hidden; }
+.lvl i { position: absolute; inset: 0 auto 0 0; background: var(--vol); border-radius: 3px; }
+.pdf-card { position: sticky; top: 76px; }
+.pdf-stage { margin-top: 10px; background: var(--surface-2); border-radius: var(--r-sm); padding: 10px; display: grid; place-items: center; min-height: 200px; }
+.pdf-stage canvas { width: 100%; max-width: 640px; height: auto; display: block; box-shadow: 0 1px 2px rgba(0,0,0,.18), 0 6px 18px rgba(0,0,0,.12); background: #fff; }
+.pdf-nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.pdf-nav .pg { font-family: var(--font-mono); font-size: 13px; margin-right: auto; }
+.pdf-thumbs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.pdf-thumbs button { appearance: none; cursor: pointer; border: 1px solid var(--line); background: var(--surface); border-radius: 4px; padding: 4px 9px; font-size: 12.5px; }
+.pdf-thumbs button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+
+@media (max-width: 1080px) {
+  .stage, .below, .edu-grid { grid-template-columns: minmax(0, 1fr); }
+  .pdf-card, .files { position: static; }
+  .lidar-box { flex: none; aspect-ratio: 16 / 10; min-height: 0; }
+}
+@media (max-width: 820px) {
+  .code-grid, .cli-grid { grid-template-columns: minmax(0, 1fr); }
+  .files, .chapters { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+  .transport { grid-template-columns: auto minmax(0, 1fr); }
+  .transport .tl { grid-column: 1 / -1; order: 5; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .detail { grid-template-columns: minmax(0, 1fr); }
+  .lidar-box { aspect-ratio: 4 / 3; }
+  .tabs { margin-left: 0; }
+}
+@media (max-width: 480px) {
+  .row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .vp-title small { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .caret { animation: none; } }
+</style>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect width="34" height="34" rx="8" fill="var(--vp-bg)"/>
+        <g fill="none" stroke="var(--c-car)" stroke-width="1.4"><path d="M7 25a14 14 0 0 1 20 0" opacity=".45"/><path d="M10 25a10 10 0 0 1 14 0" opacity=".7"/><path d="M13 25a6 6 0 0 1 8 0"/></g>
+        <rect x="14.5" y="24" width="5" height="4" rx="1" fill="var(--c-sel)"/></svg>
+      <div><div class="brand-name">Burleigh LiDAR Lab</div><div class="brand-sub">Demo edukasi persepsi 3D · Gold Coast, Australia</div></div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Bagian">
+      <a class="tab" role="tab" href="#demo" data-v="demo">Demo 3D</a>
+      <a class="tab" role="tab" href="#kode" data-v="kode">Kode Python</a>
+      <a class="tab" role="tab" href="#cli" data-v="cli">CLI <span class="k">log</span></a>
+      <a class="tab" role="tab" href="#edukasi" data-v="edukasi">Edukasi <span class="k">PDF</span></a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+<!-- =========================== DEMO =========================== -->
+<section id="view-demo" class="view" aria-label="Demo 3D">
+  <div class="view-head">
+    <div>
+      <div class="eyebrow">Volume objek dari video jalan</div>
+      <h1>Setiap mobil jadi kotak 3D: posisi, ukuran, volume</h1>
+      <p>Kiri: video asli dengan volume 3D yang digambar three.js memakai model kamera yang sama. Kanan: apa yang akan dilihat sensor LiDAR 360° di atap mobil.</p>
+    </div>
+    <span class="badge" title="Video ini direkam kamera biasa"><b>pseudo-LiDAR</b> jarak diperkirakan dari kamera, titik LiDAR disimulasikan</span>
+  </div>
+
+  <div class="stage">
+    <div class="vp">
+      <div class="video-box" id="videoBox">
+        <video id="video" src="burleigh.mp4" muted playsinline preload="auto"></video>
+        <canvas id="box2d" class="layer"></canvas>
+        <canvas id="arCanvas" class="layer"></canvas>
+        <div id="arLabels" class="layer"></div>
+      </div>
+      <div class="vp-bar"><span class="vp-title">Kamera + volume <small id="camSpec">1280×720 · fx 790 px · horizon 600 px</small></span></div>
+      <div class="vp-tools"><span class="lab">Lapisan</span>
+        <div class="chips" id="arChips">
+          <button class="chip" data-k="vol" aria-pressed="true">Volume 3D</button>
+          <button class="chip" data-k="b2d" aria-pressed="false">Kotak 2D</button>
+          <button class="chip" data-k="pts" aria-pressed="true">Titik LiDAR</button>
+          <button class="chip" data-k="rings" aria-pressed="false">Ring jarak</button>
+          <button class="chip" data-k="lbl" aria-pressed="true">Label</button>
+        </div></div>
+    </div>
+    <div class="vp">
+      <div class="lidar-box" id="lidarBox"><canvas id="lidarCanvas"></canvas><div id="lidarLabels" class="layer"></div>
+        <div class="vp-foot"><span class="scale"><span id="scaleLo">0 m</span><i id="scaleBar"></i><span id="scaleHi">4 m</span> <span id="scaleName">tinggi</span></span><span>seret = putar · scroll = zoom</span></div></div>
+      <div class="vp-bar"><span class="vp-title">LiDAR 360° <small id="lidarSub">32 channel · 10 Hz</small></span></div>
+      <div class="vp-tools"><span class="lab">Kamera</span>
+        <div class="chips" id="camChips">
+          <button class="chip" data-cam="chase" aria-pressed="true">Belakang</button>
+          <button class="chip" data-cam="bev" aria-pressed="false">Atas (BEV)</button>
+          <button class="chip" data-cam="side" aria-pressed="false">Samping</button>
+        </div></div>
+    </div>
+  </div>
+
+  <div class="transport">
+    <button class="btn primary" id="playBtn" aria-label="Putar"><svg viewBox="0 0 14 14" id="playIco"><path d="M3 1.5v11l9-5.5z" fill="currentColor"/></svg><span id="playTxt">Putar</span></button>
+    <div class="time num" id="timeTxt">16.00 <span>/ 23.03 s</span></div>
+    <div class="tl" id="timeline" role="slider" aria-label="Waktu video" tabindex="0" aria-valuemin="0" aria-valuemax="23" aria-valuenow="16"><canvas id="tlCanvas"></canvas></div>
+    <div class="seg" id="speedSeg" aria-label="Kecepatan putar">
+      <button data-s="0.25" aria-pressed="false">0.25×</button><button data-s="0.5" aria-pressed="false">0.5×</button><button data-s="1" aria-pressed="true">1×</button>
+    </div>
+  </div>
+
+  <div class="below">
+    <div class="card">
+      <div class="card-head"><h2>Objek terdeteksi</h2><span class="meta" id="objMeta">—</span></div>
+      <div class="tbl-wrap"><table class="objs">
+        <thead><tr><th>ID</th><th>Kelas</th><th class="r">Jarak</th><th class="r">l × w × h</th><th class="r">Volume</th><th class="r">v rel.</th><th class="r">Titik LiDAR</th></tr></thead>
+        <tbody id="objBody"></tbody></table></div>
+      <div class="detail" id="detail">
+        <div><div class="eyebrow">Objek dipilih</div><h3 id="dTitle">Klik baris di tabel</h3><div class="eq" id="dEq">Volume kotak = panjang × lebar × tinggi</div></div>
+        <div><canvas class="spark" id="spark"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Sensor LiDAR virtual</h2><span class="meta">ray-casting di browser</span></div>
+      <div class="settings">
+        <div class="row"><span class="lab">Channel</span><div class="seg" id="chSeg"><button data-ch="16" aria-pressed="false">16</button><button data-ch="32" aria-pressed="true">32</button><button data-ch="64" aria-pressed="false">64</button><button data-ch="128" aria-pressed="false">128</button></div></div>
+        <div class="row"><span class="lab">Warna titik</span><div class="seg" id="colSeg"><button data-c="height" aria-pressed="true">Tinggi</button><button data-c="range" aria-pressed="false">Jarak</button><button data-c="intensity" aria-pressed="false">Intensitas</button><button data-c="class" aria-pressed="false">Kelas</button></div></div>
+        <div class="stats">
+          <div class="stat"><div class="v" id="sPts">—</div><div class="k">titik per scan</div></div>
+          <div class="stat"><div class="v" id="sRays">—</div><div class="k">sinar ditembak</div></div>
+          <div class="stat"><div class="v" id="sPps">—</div><div class="k">titik / detik</div></div>
+          <div class="stat"><div class="v" id="sMs">—</div><div class="k">waktu ray-cast</div></div>
+        </div>
+        <div class="explain">
+          <p>Kotak dan jarak berasal dari deteksi nyata pada video (EfficientDet-Lite2 + tracking + geometri kamera).</p>
+          <p>Titik dihitung ulang 10 kali per detik, sama seperti LiDAR yang berputar 10 Hz. Naikkan channel dan lihat kolom <b>Titik LiDAR</b> bertambah.</p>
+          <p>Objek jauh terkena jauh lebih sedikit titik. Ini batas utama LiDAR untuk deteksi jarak jauh.</p>
+        </div>
+        <p class="note">Jalan, bangunan, pohon, dan tiang di tampilan LiDAR adalah lingkungan sintetis. Hanya objek berlabel yang berasal dari video.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================== KODE =========================== -->
+<section id="view-kode" class="view" aria-label="Kode Python" hidden>
+  <div class="view-head">
+    <div><div class="eyebrow">Python · NumPy · PyTorch</div><h1>Kode yang menghasilkan demo ini</h1>
+      <p>Semua file sudah dijalankan. Deteksi memakai MediaPipe, simulasi dan pra-pemrosesan memakai NumPy, model PointNet dan PointPillars memakai PyTorch (CPU cukup).</p></div>
+  </div>
+  <div class="code-grid">
+    <div class="files" id="fileList"></div>
+    <div>
+      <div class="codebox">
+        <div class="codebar"><span class="path" id="codePath"></span><button class="btn" id="copyBtn">Salin kode</button></div>
+        <div class="codescroll"><pre class="code" id="codeView"></pre></div>
+      </div>
+      <div class="card howto">
+        <h2>Cara menjalankan</h2>
+        <pre>python -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install -r requirements.txt
+python detect_and_lift.py --video burleigh.mp4 --model efficientdet_lite2.tflite
+python lidar_sim.py &amp;&amp; python pointcloud_ops.py
+python pointnet.py --epochs 8
+python pointpillars.py --steps 400
+python cli_view.py --t 16.0 --channels 32</pre>
+        <p class="note" style="margin-top:10px">Model EfficientDet-Lite2 (.tflite) diunduh dari katalog model MediaPipe. Semua skrip membaca/menulis folder <span class="mono">data/</span>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================== CLI =========================== -->
+<section id="view-cli" class="view" aria-label="CLI" hidden>
+  <div class="view-head">
+    <div><div class="eyebrow">Terminal</div><h1>Log CLI: dari video sampai deteksi 3D</h1>
+      <p>Log contoh untuk belajar membaca output. Bagian 2–6 direkam dari menjalankan skrip di tab Kode (dipersingkat); bagian instalasi adalah ilustrasi.</p></div>
+  </div>
+  <div class="cli-grid">
+    <div class="chapters" id="chapters"></div>
+    <div class="term">
+      <div class="term-bar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">~/lidar-edu — bash</span>
+        <button class="btn" id="cliPlay">Putar ulang</button><button class="btn" id="cliAll">Tampilkan semua</button></div>
+      <pre class="term-out" id="termOut" aria-live="off"></pre>
+    </div>
+  </div>
+</section>
+
+<!-- =========================== EDUKASI =========================== -->
+<section id="view-edukasi" class="view" aria-label="Edukasi" hidden>
+  <div class="view-head">
+    <div><div class="eyebrow">Cara kerja LiDAR</div><h1>Dari pulsa laser ke kotak 3D</h1>
+      <p>Coba setiap konsep secara interaktif di kiri. Ringkasan lengkapnya ada di PDF 6 halaman di kanan.</p></div>
+  </div>
+  <div class="edu-grid">
+    <div class="edu-col">
+      <article class="lesson">
+        <div class="eyebrow">1 · Time of Flight</div>
+        <h2>Jarak diukur dari waktu tempuh cahaya</h2>
+        <p>Geser jarak objek, lalu tembakkan pulsa. Animasi diperlambat sekitar satu miliar kali; pulsa aslinya kembali dalam hitungan nanodetik.</p>
+        <canvas id="tofCanvas" height="170"></canvas>
+        <div class="ctrl">
+          <label for="tofD"><span>Jarak objek: <b id="tofDv">25 m</b></span><input id="tofD" type="range" min="1" max="200" value="25" step="1"></label>
+          <div style="display:flex;align-items:end"><button class="btn primary" id="tofFire">Tembakkan pulsa</button></div>
+        </div>
+        <div class="formula">d = c · t / 2   →   t = 2 · <b id="tofF1">25</b> m / 299 792 458 m/s = <b id="tofF2">166.8</b> ns</div>
+        <div class="readout">
+          <div class="stat"><div class="v" id="tofT">166.8 ns</div><div class="k">waktu pulang-pergi</div></div>
+          <div class="stat"><div class="v">15 cm</div><div class="k">galat jarak per 1 ns galat waktu</div></div>
+          <div class="stat"><div class="v" id="tofMax">270 m</div><div class="k">jangkauan maksimum jika pulsa berikutnya ditembak 1,8 µs kemudian</div></div>
+        </div>
+      </article>
+
+      <article class="lesson">
+        <div class="eyebrow">2 · Pola pemindaian</div>
+        <h2>Channel membentuk ring di jalan</h2>
+        <p>Tampak samping sensor. Setiap garis adalah satu laser. Laser yang mengarah ke bawah mengenai jalan dan membentuk ring; makin jauh, makin renggang.</p>
+        <canvas id="scanCanvas" height="220"></canvas>
+        <div class="ctrl">
+          <label for="scCh"><span>Channel: <b id="scChv">32</b></span><input id="scCh" type="range" min="0" max="3" value="1" step="1"></label>
+          <label for="scH"><span>Tinggi sensor: <b id="scHv">1.8 m</b></span><input id="scH" type="range" min="0.8" max="3" value="1.8" step="0.1"></label>
+          <label for="scAz"><span>Resolusi azimut: <b id="scAzv">0.4°</b></span><input id="scAz" type="range" min="0.1" max="0.8" value="0.4" step="0.05"></label>
+          <label for="scHz"><span>Putaran: <b id="scHzv">10 Hz</b></span><input id="scHz" type="range" min="5" max="20" value="10" step="1"></label>
+        </div>
+        <div class="formula">titik/detik = <b id="scF1">32</b> channel × <b id="scF2">900</b> kolom × <b id="scF3">10</b> Hz = <b id="scF4">288 000</b></div>
+        <div class="readout">
+          <div class="stat"><div class="v" id="scR1">—</div><div class="k">ring terdekat di jalan</div></div>
+          <div class="stat"><div class="v" id="scR2">—</div><div class="k">ring di dalam 30 m</div></div>
+          <div class="stat"><div class="v" id="scR3">—</div><div class="k">jarak antar titik di 30 m</div></div>
+        </div>
+      </article>
+
+      <article class="lesson">
+        <div class="eyebrow">3 · Deteksi dengan PointPillars</div>
+        <h2>Enam langkah dari titik ke kotak</h2>
+        <p>Semua gambar dihitung dari scan LiDAR frame demo yang sedang dipilih (tampak atas, 0–48 m ke depan).</p>
+        <div class="steps" id="ppSteps"></div>
+        <canvas id="ppCanvas" height="360"></canvas>
+        <div class="step-info"><h3 id="ppTitle"></h3><span class="shape" id="ppShape"></span><p id="ppText"></p></div>
+      </article>
+
+      <article class="lesson">
+        <div class="eyebrow">4 · Konteks</div>
+        <h2>LiDAR, kamera, radar</h2>
+        <div class="tbl-wrap"><table class="cmp">
+          <thead><tr><th>Kriteria</th><th>LiDAR</th><th>Kamera</th><th>Radar</th></tr></thead>
+          <tbody id="cmpBody"></tbody></table></div>
+      </article>
+    </div>
+
+    <aside class="lesson pdf-card" aria-label="Ringkasan PDF">
+      <div class="eyebrow">Ringkasan PDF · 6 halaman</div>
+      <h2>LiDAR &amp; Deteksi Objek 3D</h2>
+      <p>Prinsip ToF, pola pemindaian, format data, PointNet, PointPillars, perbandingan sensor, dan batasan demo.</p>
+      <div class="pdf-nav"><span class="pg" id="pdfPg">memuat PDF…</span>
+        <button class="btn" id="pdfPrev" aria-label="Halaman sebelumnya">‹ Sebelumnya</button><button class="btn" id="pdfNext" aria-label="Halaman berikutnya">Berikutnya ›</button></div>
+      <div class="pdf-thumbs" id="pdfThumbs"></div>
+      <div class="pdf-stage"><canvas id="pdfCanvas" aria-label="Halaman PDF"></canvas></div>
+    </aside>
+  </div>
+</section>
+</main>
+
+<!--CODE_BLOCKS-->
+<script type="application/json" id="cliData">/*CLI_DATA*/</script>
+
+<script>window.Prism = { manual: true };</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+<script type="importmap">{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, u) => a + (b - a) * u;
+const fmt = (v, d = 1) => v.toLocaleString('id-ID', { minimumFractionDigits: d, maximumFractionDigits: d });
+const fmtInt = v => Math.round(v).toLocaleString('id-ID');
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+const CLS = {
+  car: { name: 'Mobil', col: '--c-car' }, truck: { name: 'Truk', col: '--c-truck' }, bus: { name: 'Bus', col: '--c-truck' },
+  person: { name: 'Pejalan kaki', col: '--c-person' }, 'traffic light': { name: 'Lampu lalu lintas', col: '--c-light' },
+  bicycle: { name: 'Sepeda', col: '--c-other' }, motorcycle: { name: 'Motor', col: '--c-other' } };
+const clsColor = c => cssVar((CLS[c] || { col: '--c-other' }).col);
+const clsName = c => (CLS[c] || { name: c }).name;
+
+// turbo colormap (polynomial approximation)
+function turbo(x, out) {
+  x = clamp(x, 0, 1);
+  out[0] = clamp(0.13572138 + x * (4.61539260 + x * (-42.66032258 + x * (132.13108234 + x * (-152.94239396 + x * 59.28637943)))), 0, 1);
+  out[1] = clamp(0.09140261 + x * (2.19418839 + x * (4.84296658 + x * (-14.18503333 + x * (4.27729857 + x * 2.82956604)))), 0, 1);
+  out[2] = clamp(0.10667330 + x * (12.64194608 + x * (-60.58204836 + x * (110.36276771 + x * (-89.90310912 + x * 27.34824973)))), 0, 1);
+  return out;
+}
+
+// =================================================================== DATA
+const data = await fetch('tracks.json').then(r => r.json());
+const META = data.meta, FRAMES = data.frames, FPS = META.fps, DUR = 23.03;
+FRAMES.forEach(f => { f.map = new Map(f.objects.map(o => [o.id, o])); });
+const HIST = new Map();           // id -> [[t, x, y]]
+for (const f of FRAMES) for (const o of f.objects) {
+  if (!HIST.has(o.id)) HIST.set(o.id, []);
+  HIST.get(o.id).push([f.t, o.xyz[0], o.xyz[1]]);
+}
+function angLerp(a, b, u) { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return a + d * u; }
+function stateAt(t) {
+  const i = clamp(Math.floor(t * FPS), 0, FRAMES.length - 2), A = FRAMES[i], B = FRAMES[i + 1];
+  const u = clamp((t - A.t) / (B.t - A.t), 0, 1), out = [];
+  for (const o of A.objects) {
+    const b = B.map.get(o.id);
+    if (b) out.push({ ...o, xyz: o.xyz.map((v, k) => lerp(v, b.xyz[k], u)), yaw: angLerp(o.yaw, b.yaw, u),
+                      box2d: o.box2d.map((v, k) => lerp(v, b.box2d[k], u)), vrel: lerp(o.vrel, b.vrel, u) });
+    else if (u < 0.5) out.push(o);
+  }
+  if (u >= 0.5) for (const o of B.objects) if (!A.map.has(o.id)) out.push(o);
+  return { t, v0: lerp(A.v0, B.v0, u), objects: out };
+}
+
+// =================================================================== LIDAR SIMULATOR (JS port of lidar_sim.py)
+const SENSOR_H = 1.8, MAX_RANGE = 80, FOV_UP = 10, FOV_DOWN = -25;
+const AZ_RES = { 16: 0.4, 32: 0.4, 64: 0.3, 128: 0.25 };
+function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+// synthetic street: buildings, trees, poles, sidewalks along a straight strip (world x metres)
+const ENV = (() => {
+  const rng = mulberry(7), P = [];
+  for (const side of [1, -1]) {
+    let x = -120;
+    while (x < 520) {
+      const len = 7 + rng() * 15, gap = 1 + rng() * 6, dep = 6 + rng() * 7, h = 3.5 + rng() * 10, y0 = (side > 0 ? 12 : 11) + rng() * 2.5;
+      P.push({ k: 'box', kind: 1, x: x + len / 2, y: side * (y0 + dep / 2), z: h / 2, l: len, w: dep, h, yaw: 0, refl: 0.3 + rng() * 0.25 });
+      x += len + gap;
+    }
+    x = -110 + rng() * 10;
+    while (x < 520) {
+      const r = 1.6 + rng() * 1.2, yy = side * (side > 0 ? 8.8 : 8.4);
+      P.push({ k: 'box', kind: 2, x, y: yy, z: 1.4, l: 0.35, w: 0.35, h: 2.8, yaw: 0, refl: 0.3 });
+      P.push({ k: 'sph', kind: 2, x, y: yy, z: 2.6 + r, r, refl: 0.22 });
+      x += 13 + rng() * 14;
+    }
+    x = -100 + rng() * 20;
+    while (x < 520) { P.push({ k: 'box', kind: 3, x, y: side * 7.4, z: 4, l: 0.25, w: 0.25, h: 8, yaw: 0, refl: 0.5 }); x += 30 + rng() * 12; }
+    P.push({ k: 'box', kind: 4, x: 200, y: side * 9.1, z: 0.075, l: 700, w: 5.2, h: 0.15, yaw: 0, refl: 0.32 });
+  }
+  return P;
+})();
+// ego speed (estimated by eye from the video) -> travelled distance s(t)
+const egoV = t => t < 7 ? 6 : t < 13 ? 7 : 3.5;
+const S_TAB = (() => { const a = [0]; for (let i = 1; i <= 240; i++) a.push(a[i - 1] + egoV((i - 0.5) * 0.1) * 0.1); return a; })();
+const egoS = t => { const i = clamp(Math.floor(t * 10), 0, 239), u = t * 10 - i; return lerp(S_TAB[i], S_TAB[i + 1], clamp(u, 0, 1)); };
+
+const MAXR = 128 * Math.round(360 / AZ_RES[128]);
+const SCAN = { n: 0, pos: new Float32Array(MAXR * 3), inten: new Float32Array(MAXR), label: new Int16Array(MAXR), range: new Float32Array(MAXR),
+               counts: new Map(), rays: 0, ms: 0, objs: [] };
+function simulateScan(st, channels) {
+  const t0 = performance.now(), s = egoS(st.t), prims = [];
+  // dynamic objects from the video
+  st.objects.forEach((o, i) => prims.push({ k: 'box', kind: 10 + i, id: o.id, cls: o.cls, x: o.xyz[0], y: o.xyz[1], z: o.xyz[2], l: o.lwh[0], w: o.lwh[1], h: o.lwh[2], yaw: o.yaw, refl: 0.62 }));
+  for (const p of ENV) { const x = p.x - s; if (x > -70 && x < 100) prims.push({ ...p, x }); }
+  const nAz = Math.round(360 / AZ_RES[channels]), azStep = 2 * Math.PI / nAz;
+  // precompute local-frame ray origin + azimuth span for culling
+  const buckets = Array.from({ length: nAz }, () => []);
+  prims.forEach((p, pi) => {
+    if (p.k === 'box') { const c = Math.cos(-p.yaw), sn = Math.sin(-p.yaw), ox = -p.x, oy = -p.y;
+      p.c = c; p.s = sn; p.ox = ox * c - oy * sn; p.oy = ox * sn + oy * c; p.oz = SENSOR_H - p.z; p.rad = Math.hypot(p.l, p.w) / 2; }
+    else p.rad = p.r;
+    const d = Math.hypot(p.x, p.y), a = Math.atan2(p.y, p.x);
+    if (d <= p.rad + 0.01) { for (const b of buckets) b.push(pi); return; }
+    const half = Math.asin(Math.min(1, p.rad / d)) + azStep;
+    const i0 = Math.floor((a - half + Math.PI) / azStep), i1 = Math.ceil((a + half + Math.PI) / azStep);
+    for (let i = i0; i <= i1; i++) buckets[((i % nAz) + nAz) % nAz].push(pi);
+  });
+  const elev = Array.from({ length: channels }, (_, k) => (FOV_DOWN + (FOV_UP - FOV_DOWN) * k / (channels - 1)) * Math.PI / 180);
+  const ce = elev.map(Math.cos), se = elev.map(Math.sin), rng = mulberry(Math.floor(st.t * 10) + channels);
+  let n = 0; const counts = new Map(), pos = SCAN.pos;
+  for (let ai = 0; ai < nAz; ai++) {
+    const az = -Math.PI + (ai + 0.5) * azStep, ca = Math.cos(az), sa = Math.sin(az), bk = buckets[ai];
+    for (let ci = 0; ci < channels; ci++) {
+      const dx = ce[ci] * ca, dy = ce[ci] * sa, dz = se[ci];
+      let tb = dz < 0 ? -SENSOR_H / dz : Infinity, hit = -1, kind = 0;
+      for (let q = 0; q < bk.length; q++) {
+        const p = prims[bk[q]]; let th;
+        if (p.k === 'box') {
+          const lx = dx * p.c - dy * p.s, ly = dx * p.s + dy * p.c, hl = p.l / 2, hw = p.w / 2, hh = p.h / 2;
+          let t1 = (-hl - p.ox) / lx, t2 = (hl - p.ox) / lx, tmin = Math.min(t1, t2), tmax = Math.max(t1, t2);
+          t1 = (-hw - p.oy) / ly; t2 = (hw - p.oy) / ly; tmin = Math.max(tmin, Math.min(t1, t2)); tmax = Math.min(tmax, Math.max(t1, t2));
+          t1 = (-hh - p.oz) / dz; t2 = (hh - p.oz) / dz; tmin = Math.max(tmin, Math.min(t1, t2)); tmax = Math.min(tmax, Math.max(t1, t2));
+          th = (tmax >= tmin && tmin > 0) ? tmin : Infinity;
+        } else {
+          const ox = -p.x, oy = -p.y, oz = SENSOR_H - p.z, b = ox * dx + oy * dy + oz * dz, c = ox * ox + oy * oy + oz * oz - p.r * p.r, disc = b * b - c;
+          th = disc > 0 ? -b - Math.sqrt(disc) : Infinity; if (th <= 0) th = Infinity;
+        }
+        if (th < tb) { tb = th; hit = bk[q]; }
+      }
+      if (tb > MAX_RANGE || rng() < 0.03) continue;
+      const tr = tb + (rng() + rng() + rng() - 1.5) * 0.03;
+      const x = dx * tr, y = dy * tr, z = SENSOR_H + dz * tr;
+      let inten, lab;
+      if (hit < 0) {   // road surface: lane paint is highly reflective
+        const wx = x + s, ay = Math.abs(y);
+        const paint = (Math.abs(ay - 1.75) < 0.09 && ((wx % 9) + 9) % 9 < 3) || Math.abs(ay - 5.9) < 0.1 || (Math.abs(y) < 0.08 && ((wx % 12) + 12) % 12 < 6);
+        inten = (paint ? 0.85 : 0.12 + rng() * 0.05) * (0.55 + 0.45 * Math.abs(dz)); lab = 0;
+      } else { const p = prims[hit]; inten = p.refl * (0.7 + 0.3 * rng()); lab = p.kind;
+        if (p.kind >= 10) counts.set(p.id, (counts.get(p.id) || 0) + 1); }
+      pos[n * 3] = x; pos[n * 3 + 1] = y; pos[n * 3 + 2] = z; SCAN.inten[n] = inten; SCAN.label[n] = lab; SCAN.range[n] = tr; n++;
+    }
+  }
+  SCAN.n = n; SCAN.counts = counts; SCAN.rays = nAz * channels; SCAN.ms = performance.now() - t0; SCAN.objs = st.objects; SCAN.t = st.t;
+  return SCAN;
+}
+
+// =================================================================== STATE
+const ui = { vol: true, b2d: false, pts: true, rings: false, lbl: true, channels: 32, color: 'height', cam: 'chase', sel: null, speed: 1 };
+const video = $('#video');
+let scanKey = '', curState = stateAt(16);
+const toThree = (x, y, z, v) => v.set(-y, z, -x);
+
+// =================================================================== LIDAR VIEWPORT
+const lidarBox = $('#lidarBox'), lidarCanvas = $('#lidarCanvas'), lidarLabels = $('#lidarLabels');
+const rL = new THREE.WebGLRenderer({ canvas: lidarCanvas, antialias: true });
+rL.setPixelRatio(Math.min(devicePixelRatio, 2)); rL.setClearColor(0x0a1018, 1);
+const sceneL = new THREE.Scene();
+const camL = new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 400);
+const ctl = new OrbitControls(camL, lidarCanvas);
+ctl.enableDamping = true; ctl.dampingFactor = 0.08; ctl.maxPolarAngle = Math.PI * 0.495; ctl.minDistance = 4; ctl.maxDistance = 160;
+sceneL.add(new THREE.HemisphereLight(0xcfe3ff, 0x1a2230, 1.4));
+const dl = new THREE.DirectionalLight(0xffffff, 1.2); dl.position.set(8, 20, 6); sceneL.add(dl);
+// range rings
+const ringMat = new THREE.LineBasicMaterial({ color: 0x2a3a4e, transparent: true, opacity: 0.9 });
+const RINGS = [10, 20, 30, 40, 50, 60];
+for (const r of RINGS) {
+  const g = new THREE.BufferGeometry().setFromPoints(Array.from({ length: 129 }, (_, i) => { const a = i / 128 * Math.PI * 2; return new THREE.Vector3(Math.cos(a) * r, 0.01, Math.sin(a) * r); }));
+  sceneL.add(new THREE.Line(g, ringMat));
+}
+const axisG = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0.01, 0), new THREE.Vector3(0, 0.01, -62)]);
+const axis = new THREE.Line(axisG, new THREE.LineDashedMaterial({ color: 0x3a4d63, dashSize: 1, gapSize: 1 })); axis.computeLineDistances(); sceneL.add(axis);
+// ego vehicle
+const ego = new THREE.Group();
+const mBody = new THREE.MeshStandardMaterial({ color: 0xb9c6d3, roughness: 0.5, metalness: 0.3 });
+const mGlass = new THREE.MeshStandardMaterial({ color: 0x1b2836, roughness: 0.2, metalness: 0.6 });
+const body = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.75, 4.6), mBody); body.position.set(0, 0.6, 1.4); ego.add(body);
+const cab = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.6, 2.5), mGlass); cab.position.set(0, 1.25, 1.6); ego.add(cab);
+const puck = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.22, 24), new THREE.MeshStandardMaterial({ color: 0x222a33, roughness: 0.4 }));
+puck.position.set(0, 1.68, 0.05); ego.add(puck);
+const tail = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.08, 0.05), new THREE.MeshBasicMaterial({ color: 0xff3b3b })); tail.position.set(0, 0.8, 3.71); ego.add(tail);
+sceneL.add(ego);
+// points
+const ptsGeoL = new THREE.BufferGeometry();
+ptsGeoL.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MAXR * 3), 3).setUsage(THREE.DynamicDrawUsage));
+ptsGeoL.setAttribute('color', new THREE.BufferAttribute(new Float32Array(MAXR * 3), 3).setUsage(THREE.DynamicDrawUsage));
+const ptsL = new THREE.Points(ptsGeoL, new THREE.PointsMaterial({ size: 0.11, vertexColors: true, sizeAttenuation: true }));
+ptsL.frustumCulled = false; sceneL.add(ptsL);
+// box pools
+const unitBox = new THREE.BoxGeometry(1, 1, 1), unitEdges = new THREE.EdgesGeometry(unitBox);
+function makePool(scene, fillOpacity) {
+  const pool = [];
+  return {
+    get(i) {
+      if (!pool[i]) {
+        const g = new THREE.Group();
+        const fill = new THREE.Mesh(unitBox, new THREE.MeshBasicMaterial({ transparent: true, opacity: fillOpacity, depthWrite: false }));
+        const edge = new THREE.LineSegments(unitEdges, new THREE.LineBasicMaterial({ transparent: true, opacity: 0.95 }));
+        const head = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -0.5)]), new THREE.LineBasicMaterial());
+        g.add(fill, edge, head); g.userData = { fill, edge, head }; scene.add(g); pool[i] = g;
+      }
+      return pool[i];
+    },
+    hideFrom(n) { for (let i = n; i < pool.length; i++) pool[i].visible = false; }
+  };
+}
+const poolL = makePool(sceneL, 0.16);
+const trailMat = new THREE.LineBasicMaterial({ color: 0xf4a83a, transparent: true, opacity: 0.55 });
+const trails = []; function trail(i) { if (!trails[i]) { trails[i] = new THREE.Line(new THREE.BufferGeometry(), trailMat.clone()); sceneL.add(trails[i]); } return trails[i]; }
+
+const CAMS = { chase: { p: [0, 11, 16], t: [0, 0, -14] }, bev: { p: [0, 78, -20], t: [0, 0, -21] }, side: { p: [-34, 9, -16], t: [0, 1, -16] } };
+let camTween = null;
+function setCam(name, instant) {
+  ui.cam = name; $$('#camChips .chip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.cam === name)));
+  const c = CAMS[name], to = { p: new THREE.Vector3(...c.p), t: new THREE.Vector3(...c.t) };
+  if (instant || reduceMotion) { camL.position.copy(to.p); ctl.target.copy(to.t); ctl.update(); return; }
+  camTween = { from: { p: camL.position.clone(), t: ctl.target.clone() }, to, u: 0 };
+}
+setCam('chase', true);
+$$('#camChips .chip').forEach(b => b.addEventListener('click', () => setCam(b.dataset.cam)));
+
+// =================================================================== AR OVERLAY (three.js over the video)
+const camSpec = $('#camSpec'), videoBox = $('#videoBox'), arCanvas = $('#arCanvas'), arLabels = $('#arLabels'), b2dCanvas = $('#box2d');
+const rA = new THREE.WebGLRenderer({ canvas: arCanvas, antialias: true, alpha: true });
+rA.setPixelRatio(Math.min(devicePixelRatio, 2)); rA.setClearColor(0x000000, 0);
+const sceneA = new THREE.Scene();
+const camA = new THREE.PerspectiveCamera(50, 1, 0.3, 300);
+camA.position.set(0, META.cam_height, 0); camA.lookAt(0, META.cam_height, -1);
+function setArCamera(v0) {
+  // pinhole with principal point (cx, v0): render the top 720 rows of a virtual 1280 x 2*v0 image
+  const fullH = 2 * v0;
+  camA.fov = 2 * Math.atan(v0 / META.fy) * 180 / Math.PI; camA.aspect = META.width / fullH;
+  camA.setViewOffset(META.width, fullH, 0, 0, META.width, META.height); camA.updateProjectionMatrix();
+}
+const poolA = makePool(sceneA, 0.2);
+const ptsGeoA = new THREE.BufferGeometry();
+ptsGeoA.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MAXR * 3), 3).setUsage(THREE.DynamicDrawUsage));
+ptsGeoA.setAttribute('color', new THREE.BufferAttribute(new Float32Array(MAXR * 3), 3).setUsage(THREE.DynamicDrawUsage));
+const ptsA = new THREE.Points(ptsGeoA, new THREE.PointsMaterial({ size: 2.4, vertexColors: true, sizeAttenuation: false, transparent: true, opacity: 0.9, depthTest: false }));
+ptsA.frustumCulled = false; sceneA.add(ptsA);
+const ringsA = new THREE.Group(); sceneA.add(ringsA);
+for (const r of [5, 10, 15, 20, 30]) {
+  const pts = []; for (let i = 0; i <= 64; i++) { const a = -Math.PI / 2 + (i / 64 - 0.5) * Math.PI * 0.9; pts.push(new THREE.Vector3(Math.cos(a) * r, 0.02, Math.sin(a) * r)); }
+  ringsA.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xf4a83a, transparent: true, opacity: 0.7 })));
+}
+
+// =================================================================== LABELS (HTML)
+function labelPool(host) {
+  const els = [], pos = []; let used = 0;
+  return { begin() { used = 0; },
+    put(x, y, html, color, sel, cls = 'lbl') {
+      let el = els[used]; if (!el) { el = document.createElement('div'); host.appendChild(el); els[used] = el; }
+      const c = cls + (sel ? ' sel' : ''); if (el.className !== c) el.className = c;
+      el.style.setProperty('--c', color); if (el._h !== html) { el.innerHTML = html; el._h = html; }
+      el.style.display = ''; pos[used] = [x, y]; used++; },
+    end() {
+      // greedy de-overlap: nearest (lowest on screen) keeps its spot, others move up
+      const items = []; for (let i = 0; i < used; i++) items.push({ el: els[i], x: pos[i][0], y: pos[i][1], w: els[i].offsetWidth, h: els[i].offsetHeight });
+      items.sort((a, b) => b.y - a.y); const placed = [];
+      for (const it of items) {
+        for (let k = 0; k < 12; k++) {
+          const hit = placed.find(p => Math.abs(p.x - it.x) < (p.w + it.w) / 2 + 2 && Math.abs(p.y - it.y) < (p.h + it.h) / 2 + 1);
+          if (!hit) break; it.y = hit.y - (hit.h + it.h) / 2 - 2;
+        }
+        placed.push(it); it.el.style.transform = `translate(${it.x}px, ${it.y}px) translate(-50%, -100%)`;
+      }
+      for (let i = used; i < els.length; i++) els[i].style.display = 'none'; } };
+}
+const labA = labelPool(arLabels), labL = labelPool(lidarLabels);
+const _v = new THREE.Vector3(), _c = new THREE.Color(), _rgb = [0, 0, 0];
+function project(cam, w, h, x, y, z) { toThree(x, y, z, _v).project(cam); return _v.z < 1 && _v.z > -1 ? [(_v.x + 1) / 2 * w, (1 - _v.y) / 2 * h] : null; }
+
+// =================================================================== COLOURS FOR POINTS
+function pointColor(i, mode, out) {
+  const lab = SCAN.label[i];
+  if (mode === 'height') return turbo(SCAN.pos[i * 3 + 2] / 4, out);
+  if (mode === 'range') return turbo(SCAN.range[i] / 60, out);
+  if (mode === 'intensity') { const v = clamp(SCAN.inten[i] * 1.25, 0, 1); out[0] = 0.12 + v * 0.88; out[1] = 0.18 + v * 0.8; out[2] = 0.28 + v * 0.62; return out; }
+  if (lab >= 10) { const o = SCAN.objs[lab - 10]; _c.set(o && ui.sel === o.id ? cssVar('--c-sel') : clsColor(o ? o.cls : 'car')); out[0] = _c.r; out[1] = _c.g; out[2] = _c.b; return out; }
+  const g = [[0.22, 0.25, 0.3], [0.42, 0.4, 0.5], [0.25, 0.55, 0.32], [0.6, 0.6, 0.65], [0.36, 0.38, 0.42]][lab] || [0.4, 0.4, 0.4];
+  out[0] = g[0]; out[1] = g[1]; out[2] = g[2]; return out;
+}
+function updateScale() {
+  const m = { height: ['0 m', '4 m', 'tinggi'], range: ['0 m', '60 m', 'jarak'], intensity: ['rendah', 'tinggi', 'intensitas'], class: ['', '', 'kelas'] }[ui.color];
+  $('#scaleLo').textContent = m[0]; $('#scaleHi').textContent = m[1]; $('#scaleName').textContent = m[2];
+  $('#scaleBar').style.background = ui.color === 'intensity' ? 'linear-gradient(90deg,#1f2d47,#e1f2fb)' : ui.color === 'class'
+    ? `linear-gradient(90deg, ${cssVar('--c-car')} 0 25%, ${cssVar('--c-truck')} 0 50%, ${cssVar('--c-person')} 0 75%, #5c6672 0)` : '';
+}
+function uploadPoints() {
+  const n = SCAN.n, pL = ptsGeoL.attributes.position.array, cL = ptsGeoL.attributes.color.array;
+  const pA = ptsGeoA.attributes.position.array, cA = ptsGeoA.attributes.color.array;
+  let m = 0;
+  for (let i = 0; i < n; i++) {
+    const x = SCAN.pos[i * 3], y = SCAN.pos[i * 3 + 1], z = SCAN.pos[i * 3 + 2];
+    pL[i * 3] = -y; pL[i * 3 + 1] = z; pL[i * 3 + 2] = -x;
+    pointColor(i, ui.color, _rgb); cL[i * 3] = _rgb[0]; cL[i * 3 + 1] = _rgb[1]; cL[i * 3 + 2] = _rgb[2];
+    const lab = SCAN.label[i];   // camera overlay: road (in front, near) + objects only
+    if (x > 1.5 && ((lab === 0 && x < 38 && Math.abs(y) < 6.5) || lab >= 10)) {
+      pA[m * 3] = -y; pA[m * 3 + 1] = z; pA[m * 3 + 2] = -x; turbo(SCAN.range[i] / 40, _rgb);
+      cA[m * 3] = _rgb[0]; cA[m * 3 + 1] = _rgb[1]; cA[m * 3 + 2] = _rgb[2]; m++;
+    }
+  }
+  ptsGeoL.setDrawRange(0, n); ptsGeoL.attributes.position.needsUpdate = true; ptsGeoL.attributes.color.needsUpdate = true;
+  ptsGeoA.setDrawRange(0, m); ptsGeoA.attributes.position.needsUpdate = true; ptsGeoA.attributes.color.needsUpdate = true;
+  $('#sPts').textContent = fmtInt(n); $('#sRays').textContent = fmtInt(SCAN.rays);
+  $('#sPps').textContent = (SCAN.rays * 10 / 1e6).toLocaleString('id-ID', { maximumFractionDigits: 2 }) + ' jt';
+  $('#sMs').textContent = fmt(SCAN.ms, 1) + ' ms';
+  $('#lidarSub').textContent = `${ui.channels} channel · 10 Hz · ${AZ_RES[ui.channels]}°`;
+}
+
+// =================================================================== PER-FRAME UPDATE
+function styleBox(g, o, color, sel, isAR) {
+  const { fill, edge, head } = g.userData;
+  g.visible = true;
+  toThree(o.xyz[0], o.xyz[1], o.xyz[2], g.position);
+  g.rotation.set(0, o.yaw, 0);
+  g.scale.set(o.lwh[1], o.lwh[2], o.lwh[0]);
+  const c = sel ? cssVar('--c-sel') : color;
+  fill.material.color.set(c); edge.material.color.set(c); head.material.color.set(c);
+  fill.material.opacity = sel ? 0.34 : isAR ? 0.2 : 0.14;
+  head.visible = !isAR;
+}
+function drawFrame() {
+  const st = curState;
+  // --- AR overlay
+  const w = videoBox.clientWidth, h = videoBox.clientHeight;
+  setArCamera(st.v0);
+  const spec = `1280×720 · fx ${Math.round(META.fx)} px · horizon ${Math.round(st.v0)} px`; if (camSpec.textContent !== spec) camSpec.textContent = spec;
+  let k = 0;
+  labA.begin();
+  const vis = st.objects.filter(o => o.xyz[0] > 1.5 && o.xyz[0] < 60);
+  if (ui.vol) for (const o of vis) styleBox(poolA.get(k++), o, clsColor(o.cls), ui.sel === o.id, true);
+  poolA.hideFrom(k);
+  ptsA.visible = ui.pts; ringsA.visible = ui.rings;
+  if (ui.lbl) for (const o of vis) {
+    if (o.cls === 'traffic light' && o.xyz[0] > 40) continue;
+    const top = project(camA, w, h, o.xyz[0], o.xyz[1], o.xyz[2] + o.lwh[2] / 2 + 0.05);
+    if (top) labA.put(top[0], top[1] - 2, `<b>${clsName(o.cls)} #${o.id}</b> ${fmt(o.xyz[0])} m · ${fmt(o.lwh[0] * o.lwh[1] * o.lwh[2])} m³`, clsColor(o.cls), ui.sel === o.id);
+  }
+  if (ui.rings) for (const r of [5, 10, 15, 20, 30]) { const a = 0.62, p = project(camA, w, h, r * Math.cos(a), -r * Math.sin(a), 0); if (p && p[1] < h - 8 && p[0] < w - 10) labA.put(p[0], p[1] + 7, `${r} m`, '#f4a83a', false, 'lbl ring-lbl'); }
+  labA.end();
+  rA.render(sceneA, camA);
+  // 2D boxes
+  const ctx = b2dCanvas.getContext('2d'), dpr = Math.min(devicePixelRatio, 2);
+  if (b2dCanvas.width !== Math.round(w * dpr)) { b2dCanvas.width = Math.round(w * dpr); b2dCanvas.height = Math.round(h * dpr); }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+  if (ui.b2d) { ctx.lineWidth = 1.5; for (const o of st.objects) { const [x1, y1, x2, y2] = o.box2d; ctx.strokeStyle = ui.sel === o.id ? cssVar('--c-sel') : '#ffe066'; ctx.setLineDash([5, 3]); ctx.strokeRect(x1 * w, y1 * h, (x2 - x1) * w, (y2 - y1) * h); } ctx.setLineDash([]); }
+
+  // --- LiDAR view
+  const lw = lidarBox.clientWidth, lh = lidarBox.clientHeight;
+  k = 0; labL.begin();
+  st.objects.forEach((o, i) => {
+    styleBox(poolL.get(k), o, clsColor(o.cls), ui.sel === o.id, false); k++;
+    const hist = HIST.get(o.id) || [], s = egoS(st.t), pts = [];
+    for (const [ht, hx, hy] of hist) if (ht <= st.t && ht > st.t - 2.5) pts.push(new THREE.Vector3(-hy, 0.05, -(hx - (s - egoS(ht)))));
+    const tl = trail(i); tl.geometry.setFromPoints(pts); tl.visible = pts.length > 1; tl.material.opacity = ui.sel === o.id ? 0.95 : 0.4;
+    if (o.xyz[0] < 62) { const p = project(camL, lw, lh, o.xyz[0], o.xyz[1], o.xyz[2] + o.lwh[2] / 2 + 0.3);
+      if (p) labL.put(p[0], p[1], `<b>${clsName(o.cls)} #${o.id}</b> ${fmt(o.xyz[0])} m`, clsColor(o.cls), ui.sel === o.id); }
+  });
+  poolL.hideFrom(k); for (let i = st.objects.length; i < trails.length; i++) trails[i].visible = false;
+  for (const r of [10, 20, 30, 40]) { const p = project(camL, lw, lh, r * 0.7071, -r * 0.7071, 0); if (p) labL.put(p[0], p[1] + 6, `${r} m`, '#8496aa', false, 'ring-lbl'); }
+  labL.end();
+  rL.render(sceneL, camL);
+}
+
+function refresh(force) {
+  const t = video.currentTime || 0;
+  curState = stateAt(t);
+  const key = Math.floor(t * 10) + '|' + ui.channels;          // 10 Hz sweep
+  if (force || key !== scanKey) { scanKey = key; simulateScan(curState, ui.channels); uploadPoints(); updateTable(); }
+  updateTime();
+}
+
+// =================================================================== TABLE, DETAIL, TIMELINE
+const objBody = $('#objBody');
+function updateTable() {
+  const list = curState.objects.filter(o => o.xyz[0] < 60 && o.cls !== 'traffic light').sort((a, b) => a.xyz[0] - b.xyz[0]);
+  const lights = curState.objects.filter(o => o.cls === 'traffic light').length;
+  $('#objMeta').textContent = `t = ${fmt(curState.t, 2)} s · ${list.length} objek` + (lights ? ` · ${lights} lampu lalu lintas` : '');
+  if (!list.length) { objBody.innerHTML = `<tr><td colspan="7" class="empty">Belum ada objek di jalan pada detik ini. Geser timeline ke 8–12 s atau 15–23 s.</td></tr>`; return; }
+  const maxPts = Math.max(1, ...list.map(o => SCAN.counts.get(o.id) || 0));
+  objBody.innerHTML = list.map(o => {
+    const [L, W, H] = o.lwh, n = SCAN.counts.get(o.id) || 0;
+    return `<tr data-id="${o.id}" class="${ui.sel === o.id ? 'sel' : ''}" tabindex="0">
+      <td class="mono"><span class="dot" style="--c:${clsColor(o.cls)}"></span>#${o.id}</td><td>${clsName(o.cls)}</td>
+      <td class="r mono">${fmt(o.xyz[0])} m</td><td class="r mono">${fmt(L, 2)} × ${fmt(W, 2)} × ${fmt(H, 2)}</td>
+      <td class="r mono">${fmt(L * W * H)} m³</td><td class="r mono">${o.vrel >= 0 ? '+' : '−'}${fmt(Math.abs(o.vrel))} m/s</td>
+      <td class="r mono">${fmtInt(n)}<span class="bar" style="width:${Math.round(40 * n / maxPts)}px"></span></td></tr>`;
+  }).join('');
+  drawDetail();
+}
+objBody.addEventListener('click', e => { const tr = e.target.closest('tr[data-id]'); if (tr) select(+tr.dataset.id); });
+objBody.addEventListener('keydown', e => { if (e.key === 'Enter') { const tr = e.target.closest('tr[data-id]'); if (tr) select(+tr.dataset.id); } });
+function select(id) { ui.sel = ui.sel === id ? null : id; uploadPoints(); updateTable(); drawFrame(); }
+
+function drawDetail() {
+  const cv = $('#spark'), o = curState.objects.find(q => q.id === ui.sel);
+  const ctx = cv.getContext('2d'), dpr = Math.min(devicePixelRatio, 2), W = cv.clientWidth, H = cv.clientHeight;
+  cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+  const muted = cssVar('--muted'), line = cssVar('--line'), acc = cssVar('--accent');
+  ctx.font = `11px ${cssVar('--font-mono')}`;
+  if (!o) {
+    $('#dTitle').textContent = 'Klik baris di tabel'; $('#dEq').innerHTML = 'Volume kotak = panjang × lebar × tinggi';
+    ctx.fillStyle = muted; ctx.fillText('Grafik jarak terhadap waktu (4D) muncul di sini', 4, H / 2); return;
+  }
+  const [L, Wd, Hh] = o.lwh, n = SCAN.counts.get(o.id) || 0;
+  $('#dTitle').textContent = `${clsName(o.cls)} #${o.id} · ${fmt(o.xyz[0])} m`;
+  $('#dEq').innerHTML = `Volume = <b>${fmt(L, 2)}</b> × <b>${fmt(Wd, 2)}</b> × <b>${fmt(Hh, 2)}</b> = <b>${fmt(L * Wd * Hh)} m³</b><br>${fmtInt(n)} titik LiDAR mengenai objek ini`;
+  const hist = HIST.get(o.id); if (!hist || hist.length < 2) return;
+  const t0 = hist[0][0], t1 = hist[hist.length - 1][0], xs = hist.map(h => h[1]);
+  const lo = Math.max(0, Math.min(...xs) - 2), hi = Math.max(...xs) + 2, pl = 34, pr = 8, pt = 8, pb = 18;
+  const X = t => pl + (t - t0) / Math.max(t1 - t0, 0.01) * (W - pl - pr), Y = v => pt + (1 - (v - lo) / (hi - lo)) * (H - pt - pb);
+  ctx.strokeStyle = line; ctx.lineWidth = 1; ctx.fillStyle = muted;
+  for (const v of [lo, (lo + hi) / 2, hi]) { ctx.beginPath(); ctx.moveTo(pl, Y(v)); ctx.lineTo(W - pr, Y(v)); ctx.stroke(); ctx.fillText(`${Math.round(v)} m`, 0, Y(v) + 4); }
+  ctx.fillText(`${fmt(t0)} s`, pl, H - 3); const lab = `${fmt(t1)} s`; ctx.fillText(lab, W - pr - ctx.measureText(lab).width, H - 3);
+  ctx.beginPath(); hist.forEach((h, i) => i ? ctx.lineTo(X(h[0]), Y(h[1])) : ctx.moveTo(X(h[0]), Y(h[1])));
+  ctx.strokeStyle = cssVar('--vol'); ctx.lineWidth = 2; ctx.stroke();
+  const tn = clamp(curState.t, t0, t1); ctx.strokeStyle = acc; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(tn), pt); ctx.lineTo(X(tn), H - pb); ctx.stroke();
+  ctx.fillStyle = acc; ctx.beginPath(); ctx.arc(X(tn), Y(o.xyz[0]), 4, 0, Math.PI * 2); ctx.fill();
+}
+
+const tl = $('#timeline'), tlCanvas = $('#tlCanvas');
+function drawTimeline() {
+  const ctx = tlCanvas.getContext('2d'), dpr = Math.min(devicePixelRatio, 2), W = tl.clientWidth, H = tl.clientHeight;
+  if (tlCanvas.width !== Math.round(W * dpr)) { tlCanvas.width = Math.round(W * dpr); tlCanvas.height = Math.round(H * dpr); }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+  const base = H - 14, maxN = Math.max(...FRAMES.map(f => f.objects.length)), bw = W / FRAMES.length;
+  ctx.fillStyle = cssVar('--surface-2'); ctx.fillRect(0, 0, W, base);
+  const cCar = cssVar('--vol'), cOther = cssVar('--muted');
+  FRAMES.forEach((f, i) => {
+    const cars = f.objects.filter(o => o.cls === 'car' || o.cls === 'truck' || o.cls === 'bus').length, others = f.objects.length - cars;
+    const hc = cars / maxN * (base - 4), ho = others / maxN * (base - 4);
+    ctx.fillStyle = cCar; ctx.fillRect(i * bw, base - hc, Math.ceil(bw), hc);
+    ctx.fillStyle = cOther; ctx.fillRect(i * bw, base - hc - ho, Math.ceil(bw), ho);
+  });
+  ctx.fillStyle = cssVar('--muted'); ctx.font = `10.5px ${cssVar('--font-mono')}`;
+  for (let s = 0; s <= 20; s += 5) { const x = s / DUR * W; ctx.fillRect(x, base, 1, 4); ctx.fillText(`${s}s`, Math.min(x + 2, W - 22), H - 2); }
+  const x = (video.currentTime || 0) / DUR * W;
+  ctx.fillStyle = cssVar('--accent'); ctx.fillRect(x - 1, 0, 2, base + 3);
+  ctx.beginPath(); ctx.moveTo(x - 5, 0); ctx.lineTo(x + 5, 0); ctx.lineTo(x, 6); ctx.fill();
+}
+function seekFromEvent(e) { const r = tl.getBoundingClientRect(); video.currentTime = clamp((e.clientX - r.left) / r.width, 0, 1) * (DUR - 0.05); }
+tl.addEventListener('pointerdown', e => { tl.setPointerCapture(e.pointerId); seekFromEvent(e); });
+tl.addEventListener('pointermove', e => { if (tl.hasPointerCapture(e.pointerId)) seekFromEvent(e); });
+tl.addEventListener('keydown', e => { if (e.key === 'ArrowRight') video.currentTime = Math.min(DUR - 0.05, video.currentTime + 1 / FPS); if (e.key === 'ArrowLeft') video.currentTime = Math.max(0, video.currentTime - 1 / FPS); });
+function updateTime() {
+  $('#timeTxt').innerHTML = `${fmt(video.currentTime || 0, 2)} <span>/ ${fmt(DUR, 2)} s</span>`;
+  tl.setAttribute('aria-valuenow', (video.currentTime || 0).toFixed(1)); drawTimeline();
+}
+
+// =================================================================== CONTROLS
+const playBtn = $('#playBtn');
+function setPlayUI() { const p = !video.paused; $('#playTxt').textContent = p ? 'Jeda' : 'Putar';
+  $('#playIco').innerHTML = p ? '<path d="M3 2h3v10H3zM8 2h3v10H8z" fill="currentColor"/>' : '<path d="M3 1.5v11l9-5.5z" fill="currentColor"/>'; }
+playBtn.addEventListener('click', () => { video.paused ? video.play() : video.pause(); });
+video.addEventListener('play', setPlayUI); video.addEventListener('pause', setPlayUI);
+video.addEventListener('ended', () => { video.currentTime = 0; video.play(); });
+video.addEventListener('seeked', () => { refresh(true); drawFrame(); });
+$$('#speedSeg button').forEach(b => b.addEventListener('click', () => { video.playbackRate = +b.dataset.s; $$('#speedSeg button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); }));
+$$('#arChips .chip').forEach(b => b.addEventListener('click', () => { const k = b.dataset.k; ui[k] = !ui[k]; b.setAttribute('aria-pressed', String(ui[k])); drawFrame(); }));
+$$('#chSeg button').forEach(b => b.addEventListener('click', () => { ui.channels = +b.dataset.ch; $$('#chSeg button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); refresh(true); drawFrame(); }));
+$$('#colSeg button').forEach(b => b.addEventListener('click', () => { ui.color = b.dataset.c; $$('#colSeg button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); updateScale(); uploadPoints(); drawFrame(); }));
+
+function resize() {
+  const w = videoBox.clientWidth, h = videoBox.clientHeight; if (w) rA.setSize(w, h, false);
+  const lw = lidarBox.clientWidth, lh = lidarBox.clientHeight; if (lw) { rL.setSize(lw, lh, false); camL.aspect = lw / lh; camL.updateProjectionMatrix(); }
+  drawTimeline(); drawDetail(); drawFrame();
+}
+new ResizeObserver(resize).observe(videoBox); new ResizeObserver(resize).observe(lidarBox);
+
+function loop() {
+  if (!$('#view-demo').hidden) {
+    if (!video.paused) refresh(false);
+    if (camTween) { camTween.u = Math.min(1, camTween.u + 0.06); const e = 1 - Math.pow(1 - camTween.u, 3);
+      camL.position.lerpVectors(camTween.from.p, camTween.to.p, e); ctl.target.lerpVectors(camTween.from.t, camTween.to.t, e); if (camTween.u >= 1) camTween = null; }
+    ctl.update(); drawFrame();
+  }
+  requestAnimationFrame(loop);
+}
+video.currentTime = 16;
+updateScale(); refresh(true); resize(); requestAnimationFrame(loop);
+video.addEventListener('loadeddata', () => { refresh(true); drawFrame(); }, { once: true });
+
+// =================================================================== ROUTING
+const VIEWS = ['demo', 'kode', 'cli', 'edukasi'];
+const inits = {};
+function route() {
+  const h = location.hash.slice(1), v = VIEWS.includes(h) ? h : 'demo';
+  VIEWS.forEach(x => { $('#view-' + x).hidden = x !== v; });
+  $$('.tab').forEach(a => a.setAttribute('aria-selected', String(a.dataset.v === v)));
+  if (v !== 'demo' && !video.paused) video.pause();
+  if (v === 'demo') requestAnimationFrame(resize);
+  if (!inits[v]) { inits[v] = true; ({ kode: initCode, cli: initCli, edukasi: initEdu })[v]?.(); }
+  else if (v === 'edukasi') eduRefresh();
+}
+addEventListener('hashchange', route); route();
+
+// =================================================================== KODE
+function initCode() {
+  const files = [...document.querySelectorAll('script[type="text/x-python"], script[type="text/plain"][data-file]')];
+  const list = $('#fileList');
+  files.forEach((s, i) => {
+    const b = document.createElement('button'); b.className = 'file'; b.setAttribute('aria-pressed', 'false');
+    b.innerHTML = `<div class="n">${s.dataset.file}</div><div class="d">${s.dataset.desc}</div><div class="tags">${(s.dataset.tags || '').split(',').filter(Boolean).map(t => `<span>${t}</span>`).join('')}</div>`;
+    b.addEventListener('click', () => show(i)); list.appendChild(b);
+  });
+  function show(i) {
+    const s = files[i], src = s.textContent.replace(/^\n/, '');
+    $$('.file', list).forEach((b, j) => b.setAttribute('aria-pressed', String(j === i)));
+    $('#codePath').innerHTML = `~/lidar-edu/<b>${s.dataset.file}</b> · ${src.split('\n').length} baris`;
+    const lang = s.dataset.file.endsWith('.py') ? 'python' : null;
+    const html = lang && window.Prism?.languages?.python ? Prism.highlight(src, Prism.languages.python, 'python') : src.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    // split highlighted html into lines, re-opening spans that cross line breaks
+    const out = []; let open = [];
+    for (const line of html.split('\n')) {
+      let l = open.join('') + line; const re = /<span[^>]*>|<\/span>/g; let m;
+      while ((m = re.exec(line))) { if (m[0] === '</span>') open.pop(); else open.push(m[0]); }
+      out.push(`<span class="ln">${l}${'</span>'.repeat(open.length)}</span>`);
+    }
+    $('#codeView').innerHTML = out.join(''); $('#codeView').dataset.src = i;
+  }
+  $('#copyBtn').addEventListener('click', async () => {
+    const src = files[+$('#codeView').dataset.src].textContent.replace(/^\n/, ''), btn = $('#copyBtn');
+    try { await navigator.clipboard.writeText(src); btn.textContent = 'Tersalin'; }
+    catch { const r = document.createRange(); r.selectNodeContents($('#codeView')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); btn.textContent = 'Tekan Ctrl+C'; }
+    setTimeout(() => { btn.textContent = 'Salin kode'; }, 1800);
+  });
+  show(0);
+}
+
+// =================================================================== CLI
+function initCli() {
+  const CH = JSON.parse($('#cliData').textContent), out = $('#termOut'), chapList = $('#chapters');
+  let timer = null, cur = 0, html = '';
+  const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  function color(line) {
+    if (line.startsWith('$ ')) return `<span class="t-ps">$</span> <span class="t-cmd">${esc(line.slice(2))}</span>`;
+    if (line.includes('│') && /m? │|^\s+│/.test(line)) {
+      return esc(line).replace(/[·:\-=+*#▣▲]/g, c => c === '·' ? `<span class="t-dim">·</span>` : c === '▣' ? `<span class="t-obj">▣</span>` : c === '▲' ? `<span class="t-ego">▲</span>`
+        : '#*'.includes(c) ? `<span class="t-den">${c}</span>` : `<span class="t-den2">${c}</span>`).replace(/(\d+)m │/, '<span class="t-dim">$1m</span> │');
+    }
+    let s = esc(line);
+    s = s.replace(/^(\[[^\]]+\])/, '<span class="t-tag">$1</span>');
+    s = s.replace(/\b(Successfully installed|selesai|OK)\b/g, '<span class="t-ok">$1</span>');
+    s = s.replace(/(WARNING|PERINGATAN)/g, '<span class="t-warn">$1</span>');
+    s = s.replace(/([a-z_]+)=([-\d.,%e+]+)/gi, '<span class="t-dim">$1=</span><span class="t-val">$2</span>');
+    s = s.replace(/^(\s*#.*)$/, '<span class="t-dim">$1</span>');
+    return s;
+  }
+  CH.forEach((c, i) => {
+    const b = document.createElement('button'); b.className = 'chap';
+    b.innerHTML = `<span class="i">${String(i + 1).padStart(2, '0')}</span><span class="t">${c.title}</span><span class="s">${c.sub}</span>`;
+    b.addEventListener('click', () => play(i)); chapList.appendChild(b);
+  });
+  const chaps = $$('.chap', chapList);
+  function mark(i) { chaps.forEach((b, j) => { b.setAttribute('aria-current', String(j === i)); b.classList.toggle('done', j < i); }); }
+  function renderAll() {
+    clearTimeout(timer); html = CH.map(c => c.lines.map(color).join('\n')).join('\n\n');
+    out.innerHTML = html + '\n<span class="t-ps">$</span> <span class="caret"></span>'; mark(CH.length); out.scrollTop = 0;
+  }
+  function play(i) {
+    clearTimeout(timer); cur = i; mark(i); html = CH.slice(0, i).map(c => c.lines.map(color).join('\n')).join('\n\n') + (i ? '\n\n' : '');
+    let li = 0, ci = 0; const lines = CH[i].lines;
+    const tick = () => {
+      if (li >= lines.length) { if (i + 1 < CH.length) { timer = setTimeout(() => play(i + 1), 900); } else { mark(CH.length); out.innerHTML = html + '<span class="t-ps">$</span> <span class="caret"></span>'; } return; }
+      const line = lines[li];
+      if (line.startsWith('$ ') && ci < line.length) {
+        ci = Math.min(line.length, ci + 2);
+        out.innerHTML = html + color(line.slice(0, ci)) + '<span class="caret"></span>'; out.scrollTop = out.scrollHeight;
+        timer = setTimeout(tick, 22); return;
+      }
+      html += color(line) + '\n'; li++; ci = 0;
+      out.innerHTML = html + '<span class="caret"></span>'; out.scrollTop = out.scrollHeight;
+      timer = setTimeout(tick, line.startsWith('$ ') ? 380 : line.includes('│') ? 14 : 70);
+    };
+    tick();
+  }
+  $('#cliPlay').addEventListener('click', () => play(0));
+  $('#cliAll').addEventListener('click', renderAll);
+  reduceMotion ? renderAll() : play(0);
+}
+
+// =================================================================== EDUKASI
+let eduRefresh = () => {};
+function initEdu() {
+  const C = 299792458;
+  // ---- ToF
+  const tc = $('#tofCanvas'), tD = $('#tofD'); let pulse = null;
+  const xOf = (d, W) => 70 + Math.log10(d) / Math.log10(200) * (W - 150);
+  function drawTof() {
+    const dpr = Math.min(devicePixelRatio, 2), W = tc.clientWidth, H = 170; tc.width = W * dpr; tc.height = H * dpr;
+    const ctx = tc.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = cssVar('--vp-bg'); ctx.fillRect(0, 0, W, H);
+    const d = +tD.value, tx = xOf(d, W), gy = 120;
+    ctx.strokeStyle = '#1f2b3a'; ctx.beginPath(); ctx.moveTo(0, gy + 18); ctx.lineTo(W, gy + 18); ctx.stroke();
+    ctx.font = `10px ${cssVar('--font-mono')}`; ctx.fillStyle = '#8496aa';
+    for (const m of [1, 10, 50, 100, 200]) { const x = xOf(m, W); ctx.fillRect(x, gy + 18, 1, 5); ctx.fillText(`${m} m`, x - 8, gy + 34); }
+    // sensor
+    ctx.fillStyle = '#2a3a4c'; ctx.fillRect(22, gy - 34, 40, 30); ctx.fillStyle = '#46d2e6'; ctx.fillRect(58, gy - 23, 6, 8);
+    ctx.fillStyle = '#dde6ee'; ctx.fillText('LiDAR', 26, gy + 8);
+    // car target
+    ctx.fillStyle = '#3a4c60'; ctx.fillRect(tx, gy - 30, 54, 24); ctx.fillRect(tx + 10, gy - 44, 32, 16);
+    ctx.fillStyle = '#0a1018'; ctx.beginPath(); ctx.arc(tx + 12, gy - 4, 6, 0, 7); ctx.arc(tx + 42, gy - 4, 6, 0, 7); ctx.fill();
+    // beam & pulse
+    ctx.strokeStyle = 'rgba(244,168,58,.25)'; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(64, gy - 19); ctx.lineTo(tx, gy - 19); ctx.stroke(); ctx.setLineDash([]);
+    if (pulse) {
+      const u = pulse.u, out = u < 0.5, f = out ? u * 2 : 2 - u * 2, x = 64 + (tx - 64) * f;
+      const grad = ctx.createRadialGradient(x, gy - 19, 0, x, gy - 19, 14); const col = out ? '244,168,58' : '70,210,230';
+      grad.addColorStop(0, `rgba(${col},1)`); grad.addColorStop(1, `rgba(${col},0)`); ctx.fillStyle = grad; ctx.fillRect(x - 14, gy - 33, 28, 28);
+      ctx.fillStyle = '#dde6ee'; ctx.font = `12px ${cssVar('--font-mono')}`;
+      ctx.fillText(`t = ${fmt(u * 2 * d / C * 1e9, 1)} ns ${out ? '→ menuju objek' : '← kembali ke sensor'}`, 22, 24);
+    } else { ctx.fillStyle = '#8496aa'; ctx.font = `12px ${cssVar('--font-mono')}`; ctx.fillText('Tekan "Tembakkan pulsa"', 22, 24); }
+  }
+  function updTof() {
+    const d = +tD.value, t = 2 * d / C * 1e9;
+    $('#tofDv').textContent = `${d} m`; $('#tofF1').textContent = d; $('#tofF2').textContent = fmt(t, 1); $('#tofT').textContent = `${fmt(t, 1)} ns`;
+    $('#tofMax').textContent = `${fmtInt(C * 1.8e-6 / 2)} m`; drawTof();
+  }
+  tD.addEventListener('input', updTof);
+  $('#tofFire').addEventListener('click', () => {
+    if (reduceMotion) { pulse = { u: 0.99 }; drawTof(); return; }
+    const start = performance.now(); const step = now => { pulse = { u: Math.min(0.999, (now - start) / 1800) }; drawTof(); if (pulse.u < 0.999) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  });
+
+  // ---- scan pattern
+  const sc = $('#scanCanvas'), CHS = [16, 32, 64, 128];
+  function updScan() {
+    const ch = CHS[+$('#scCh').value], h = +$('#scH').value, az = +$('#scAz').value, hz = +$('#scHz').value, cols = Math.round(360 / az);
+    $('#scChv').textContent = ch; $('#scHv').textContent = `${fmt(h)} m`; $('#scAzv').textContent = `${az}°`; $('#scHzv').textContent = `${hz} Hz`;
+    $('#scF1').textContent = ch; $('#scF2').textContent = fmtInt(cols); $('#scF3').textContent = hz; $('#scF4').textContent = fmtInt(ch * cols * hz);
+    const dpr = Math.min(devicePixelRatio, 2), W = sc.clientWidth, H = 220; sc.width = W * dpr; sc.height = H * dpr;
+    const ctx = sc.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = cssVar('--vp-bg'); ctx.fillRect(0, 0, W, H);
+    const gy = H - 30, x0 = 30, maxD = 40, sx = (W - x0 - 14) / maxD, sy = 22, syv = Math.min(sy, (gy - 20) / 3.2);
+    const sxp = x0, syp = gy - h * syv;
+    ctx.strokeStyle = '#3a4d63'; ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke();
+    ctx.fillStyle = '#8496aa'; ctx.font = `10px ${cssVar('--font-mono')}`;
+    for (let m = 5; m <= maxD; m += 5) { const x = x0 + m * sx; ctx.fillRect(x, gy, 1, 4); ctx.fillText(`${m} m`, x - 10, gy + 16); }
+    ctx.fillStyle = '#3a4c60'; ctx.fillRect(sxp - 16, gy - 14, 40, 14); ctx.fillStyle = '#5a6b80'; ctx.fillRect(sxp - 2, syp, 4, gy - 14 - syp);
+    const rings = [];
+    for (let k = 0; k < ch; k++) {
+      const el = (FOV_DOWN + (FOV_UP - FOV_DOWN) * k / (ch - 1)) * Math.PI / 180;
+      let ex, ey, hitG = false;
+      if (el < 0) { const dist = h / Math.tan(-el); if (dist <= maxD) { ex = x0 + dist * sx; ey = gy; hitG = true; rings.push(dist); } else { ex = W - 14; ey = syp + (ex - sxp) * Math.tan(-el) * syv / sx; } }
+      else { ex = W - 14; ey = syp - (ex - sxp) * Math.tan(el) * syv / sx; }
+      ctx.strokeStyle = hitG ? 'rgba(70,210,230,.55)' : 'rgba(70,210,230,.16)'; ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.moveTo(sxp, syp); ctx.lineTo(ex, Math.max(2, ey)); ctx.stroke();
+      if (hitG) { ctx.fillStyle = '#f4a83a'; ctx.beginPath(); ctx.arc(ex, gy, 2.4, 0, 7); ctx.fill(); }
+    }
+    ctx.fillStyle = '#dde6ee'; ctx.font = `11px ${cssVar('--font-mono')}`; ctx.fillText(`${ch} laser · ${FOV_DOWN}° s.d. +${FOV_UP}°`, 12, 18);
+    rings.sort((a, b) => a - b);
+    $('#scR1').textContent = rings.length ? `${fmt(rings[0])} m` : '—';
+    $('#scR2').textContent = `${rings.filter(r => r <= 30).length} ring`;
+    $('#scR3').textContent = `${fmt(2 * 30 * Math.tan(az / 2 * Math.PI / 180) * 100, 0)} cm`;
+  }
+  ['#scCh', '#scH', '#scAz', '#scHz'].forEach(s => $(s).addEventListener('input', updScan));
+
+  // ---- PointPillars stepper (uses the current demo scan)
+  const STEPS = [
+    ['Point cloud mentah', 'Satu sweep: setiap titik punya x, y, z, intensitas. Warna = tinggi. Lingkaran rapat di dekat mobil adalah ring dari tiap channel.', n => `(N, 4) = ${fmtInt(n.all)} × 4`],
+    ['Hapus jalan', 'Titik di bidang jalan dibuang (RANSAC di pointcloud_ops.py). Yang tersisa: mobil, pejalan kaki, pohon, tiang, bangunan.', n => `(${fmtInt(n.obj)}, 4)`],
+    ['Kelompokkan ke pillar', 'Tanah dibagi grid 0,32 m. Semua titik dalam satu kolom vertikal masuk satu pillar; tiap titik diperkaya jadi 9 fitur.', n => `(P, 32, 9), P = ${fmtInt(n.pillars)}`],
+    ['Pseudo-image', 'PointNet mini meringkas tiap pillar jadi 64 angka, lalu disusun kembali ke grid. Hasilnya mirip gambar dari atas, siap untuk CNN 2D.', () => '(64, 160, 160)'],
+    ['Peta skor anchor', 'Kepala SSD memberi skor untuk anchor di setiap sel. Sel di tengah objek bernilai tinggi (terang).', () => '(6 anchor × 80 × 80)'],
+    ['Kotak 3D + NMS', 'Anchor terbaik digeser dan diubah ukurannya menjadi kotak 7 parameter. NMS membuang kotak yang tumpang-tindih.', n => `${n.boxes} kotak · (x, y, z, l, w, h, θ)`],
+  ];
+  let ppStep = 0;
+  const steps = $('#ppSteps');
+  STEPS.forEach((s, i) => { const b = document.createElement('button'); b.className = 'step'; b.innerHTML = `<span class="n">${i + 1}</span>${s[0]}`;
+    b.addEventListener('click', () => { ppStep = i; drawPP(); }); steps.appendChild(b); });
+  function drawPP() {
+    $$('.step', steps).forEach((b, i) => b.setAttribute('aria-pressed', String(i === ppStep)));
+    const pc = $('#ppCanvas'), dpr = Math.min(devicePixelRatio, 2), W = pc.clientWidth, H = Math.round(Math.min(420, Math.max(260, W * 0.62)));
+    pc.style.height = H + 'px'; pc.width = W * dpr; pc.height = H * dpr;
+    const ctx = pc.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = cssVar('--vp-bg'); ctx.fillRect(0, 0, W, H);
+    const XR = 48, YR = 24, sc2 = Math.min((H - 20) / XR, (W - 20) / (2 * YR)), ox = W / 2, oy = H - 10;
+    const P = (x, y) => [ox - y * sc2, oy - x * sc2];
+    const n = SCAN.n, pos = SCAN.pos, lab = SCAN.label, rgb = [0, 0, 0];
+    const cell = 0.32, NXc = Math.round(XR / cell), NYc = Math.round(2 * YR / cell), cnt = new Float32Array(NXc * NYc), zmax = new Float32Array(NXc * NYc);
+    let all = 0, obj = 0;
+    for (let i = 0; i < n; i++) { const x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2]; if (x < 0 || x >= XR || Math.abs(y) >= YR) continue; all++;
+      if (lab[i] !== 0 && !(lab[i] === 4 && z < 0.3)) { obj++; const ix = Math.floor(x / cell), iy = Math.floor((y + YR) / cell), k = ix * NYc + iy; cnt[k]++; zmax[k] = Math.max(zmax[k], z); } }
+    const pillars = cnt.reduce((a, v) => a + (v > 0), 0);
+    if (ppStep <= 1) {
+      for (let i = 0; i < n; i++) { const x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2]; if (x < 0 || x >= XR || Math.abs(y) >= YR) continue;
+        if (ppStep === 1 && (lab[i] === 0 || (lab[i] === 4 && z < 0.3))) continue;
+        turbo(0.12 + z / 5, rgb); ctx.fillStyle = `rgb(${rgb[0] * 255 | 0},${rgb[1] * 255 | 0},${rgb[2] * 255 | 0})`; const [u, v] = P(x, y); ctx.fillRect(u - 0.8, v - 0.8, 1.7, 1.7); }
+    } else {
+      const cw = cell * sc2;
+      if (ppStep === 2) { ctx.strokeStyle = 'rgba(132,150,170,.08)'; ctx.lineWidth = 1; for (let ix = 0; ix <= NXc; ix += 5) { const [a, b] = P(ix * cell, YR), [c2, d2] = P(ix * cell, -YR); ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(c2, d2); ctx.stroke(); } }
+      for (let ix = 0; ix < NXc; ix++) for (let iy = 0; iy < NYc; iy++) { const k = ix * NYc + iy; if (!cnt[k]) continue;
+        const [u, v] = P((ix + 1) * cell, iy * cell - YR + cell);
+        if (ppStep === 2) { const a = clamp(cnt[k] / 12, 0.25, 1); ctx.fillStyle = `rgba(70,210,230,${a})`; }
+        else { turbo(0.15 + zmax[k] / 5, rgb); const dim = ppStep >= 4 ? 0.35 : 1; ctx.fillStyle = `rgb(${rgb[0] * 255 * dim | 0},${rgb[1] * 255 * dim | 0},${rgb[2] * 255 * dim | 0})`; }
+        ctx.fillRect(u, v, Math.max(1, cw), Math.max(1, cw));
+      }
+    }
+    const objs = SCAN.objs.filter(o => o.cls !== 'traffic light' && o.xyz[0] > 0 && o.xyz[0] < XR && Math.abs(o.xyz[1]) < YR);
+    if (ppStep === 4) for (const o of objs) { const [u, v] = P(o.xyz[0], o.xyz[1]), r = Math.max(10, o.lwh[0] * sc2 * 0.8);
+      const g = ctx.createRadialGradient(u, v, 0, u, v, r); g.addColorStop(0, 'rgba(255,214,102,.95)'); g.addColorStop(1, 'rgba(255,120,40,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(u, v, r, 0, 7); ctx.fill(); }
+    if (ppStep === 5) { ctx.font = `11px ${cssVar('--font-mono')}`; for (const o of objs) {
+      const c = Math.cos(o.yaw), s2 = Math.sin(o.yaw), [L, Wd] = o.lwh, pts = [[L / 2, Wd / 2], [L / 2, -Wd / 2], [-L / 2, -Wd / 2], [-L / 2, Wd / 2]].map(([a, b]) => P(o.xyz[0] + a * c - b * s2, o.xyz[1] + a * s2 + b * c));
+      ctx.strokeStyle = clsColor(o.cls); ctx.lineWidth = 2; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.closePath(); ctx.stroke();
+      ctx.fillStyle = '#eef4f8'; ctx.fillText(`#${o.id}`, pts[0][0] + 4, pts[0][1] - 4); } }
+    // ego + range marks
+    const [eu, ev] = P(0, 0); ctx.fillStyle = '#dde6ee'; ctx.fillRect(eu - 0.95 * sc2, ev - 1, 1.9 * sc2, 4);
+    ctx.fillStyle = '#8496aa'; ctx.font = `10px ${cssVar('--font-mono')}`; for (const r of [10, 20, 30, 40]) { const [u, v] = P(r, YR - 0.5); ctx.fillText(`${r} m`, u + 2, v + 3); }
+    const s = STEPS[ppStep]; $('#ppTitle').textContent = `${ppStep + 1}. ${s[0]}`; $('#ppText').textContent = s[1];
+    $('#ppShape').textContent = s[2]({ all, obj, pillars, boxes: objs.length });
+  }
+
+  // ---- comparison table
+  const L = (v, t) => `<span class="lvl"><i style="width:${v * 25}%"></i></span>${t}`;
+  $('#cmpBody').innerHTML = [
+    ['Jarak', L(4, 'langsung, ±2–3 cm'), L(1, 'harus diperkirakan'), L(3, 'langsung, kurang presisi')],
+    ['Bentuk & volume 3D', L(4, 'sangat baik'), L(2, 'terbatas'), L(1, 'kasar')],
+    ['Warna, rambu, tulisan', L(0, 'tidak bisa'), L(4, 'sangat baik'), L(0, 'tidak bisa')],
+    ['Kecepatan objek', L(2, 'dari selisih frame'), L(2, 'dari selisih frame'), L(4, 'langsung (Doppler)')],
+    ['Malam hari', L(4, 'tidak terpengaruh'), L(1, 'menurun'), L(4, 'tidak terpengaruh')],
+    ['Hujan, kabut', L(2, 'menurun'), L(2, 'menurun'), L(4, 'tetap baik')],
+    ['Biaya', L(1, 'tinggi, terus turun'), L(4, 'rendah'), L(3, 'rendah')],
+  ].map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('');
+
+  // ---- PDF viewer (pdf.js, main-thread worker)
+  const loadScript = src => new Promise((ok, fail) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = fail; document.head.appendChild(s); });
+  let pdf = null, page = 1, rendering = null;
+  async function renderPage() {
+    if (!pdf) return; const cv = $('#pdfCanvas'), stage = cv.parentElement;
+    const pg = await pdf.getPage(page), w = Math.min(640, stage.clientWidth - 20), vp1 = pg.getViewport({ scale: 1 }), scale = w / vp1.width, dpr = Math.min(devicePixelRatio, 2);
+    const vp = pg.getViewport({ scale: scale * dpr }); cv.width = vp.width; cv.height = vp.height; cv.style.width = w + 'px';
+    if (rendering) { try { rendering.cancel(); } catch {} }
+    rendering = pg.render({ canvasContext: cv.getContext('2d'), viewport: vp });
+    try { await rendering.promise; } catch {}
+    $('#pdfPg').textContent = `Halaman ${page} / ${pdf.numPages}`;
+    $$('#pdfThumbs button').forEach((b, i) => b.setAttribute('aria-pressed', String(i + 1 === page)));
+  }
+  const TITLES = ['Ringkasan', 'Time of Flight', 'Pemindaian', 'Data', 'PointNet & Pillars', 'Konteks'];
+  (async () => {
+    try {
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js');
+      const lib = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
+      lib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      pdf = await lib.getDocument({ url: 'lidar-edukasi.pdf', isEvalSupported: false }).promise;
+      $('#pdfThumbs').innerHTML = Array.from({ length: pdf.numPages }, (_, i) => `<button data-p="${i + 1}">${i + 1} · ${TITLES[i] || ''}</button>`).join('');
+      $$('#pdfThumbs button').forEach(b => b.addEventListener('click', () => { page = +b.dataset.p; renderPage(); }));
+      renderPage();
+    } catch (e) { $('#pdfPg').textContent = 'PDF gagal dimuat. Muat ulang halaman untuk mencoba lagi.'; console.error(e); }
+  })();
+  $('#pdfPrev').addEventListener('click', () => { if (pdf && page > 1) { page--; renderPage(); } });
+  $('#pdfNext').addEventListener('click', () => { if (pdf && page < pdf.numPages) { page++; renderPage(); } });
+
+  eduRefresh = () => { updTof(); updScan(); drawPP(); renderPage(); };
+  new ResizeObserver(() => { if (!$('#view-edukasi').hidden) eduRefresh(); }).observe($('.edu-grid'));
+  eduRefresh();
+}
+</script>

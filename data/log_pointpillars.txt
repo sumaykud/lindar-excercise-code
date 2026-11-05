@@ -1,0 +1,51 @@
+$ python pointpillars.py --steps 400
+[data] frame latih=275  frame validasi=69 (split waktu 80/20)
+[grid] 160x160 pillar @ 0.32 m   anchor=38,400 (6/lokasi)
+[model] PointPillars  parameter=3,354,108
+[step 0001/400] loss= 4.5158  cls=1.0775  box=1.6513  dir=0.6779  pos_anchor= 18  lr=8.03e-05  0.49s/it
+[step 0010/400] loss= 8.1508  cls=1.0623  box=3.4825  dir=0.6171  pos_anchor=  9  lr=1.13e-04  0.42s/it
+[step 0020/400] loss= 4.2054  cls=0.9583  box=1.5357  dir=0.8778  pos_anchor= 16  lr=2.11e-04  0.73s/it
+[step 0030/400] loss= 3.1082  cls=1.0229  box=0.9714  dir=0.7127  pos_anchor= 12  lr=3.66e-04  0.66s/it
+[step 0040/400] loss= 2.0299  cls=0.9092  box=0.4889  dir=0.7142  pos_anchor= 20  lr=5.67e-04  0.61s/it
+[step 0050/400] loss= 1.6815  cls=0.9009  box=0.3372  dir=0.5315  pos_anchor= 14  lr=8.02e-04  0.61s/it
+[step 0060/400] loss= 1.2772  cls=0.8073  box=0.1555  dir=0.7946  pos_anchor= 24  lr=1.05e-03  0.91s/it
+[step 0070/400] loss= 1.3253  cls=0.7700  box=0.2042  dir=0.7349  pos_anchor= 14  lr=1.30e-03  0.85s/it
+[step 0080/400] loss= 1.1064  cls=0.7618  box=0.1133  dir=0.5902  pos_anchor= 13  lr=1.53e-03  0.80s/it
+[step 0090/400] loss= 1.1998  cls=0.7485  box=0.1412  dir=0.8450  pos_anchor= 12  lr=1.73e-03  0.75s/it
+[step 0100/400] loss= 1.3410  cls=0.9027  box=0.1517  dir=0.6746  pos_anchor=  5  lr=1.88e-03  0.72s/it
+[step 0110/400] loss= 0.8154  cls=0.5382  box=0.1129  dir=0.2568  pos_anchor= 26  lr=1.97e-03  0.70s/it
+[step 0120/400] loss= 1.0534  cls=0.6460  box=0.1526  dir=0.5102  pos_anchor= 17  lr=2.00e-03  0.67s/it
+[step 0130/400] loss= 1.2659  cls=0.6790  box=0.2341  dir=0.5929  pos_anchor= 16  lr=1.99e-03  0.65s/it
+[step 0140/400] loss= 1.4505  cls=0.6982  box=0.3218  dir=0.5428  pos_anchor=  7  lr=1.97e-03  0.64s/it
+[step 0150/400] loss= 0.7751  cls=0.5025  box=0.1091  dir=0.2726  pos_anchor= 15  lr=1.94e-03  0.62s/it
+[step 0160/400] loss= 0.8538  cls=0.5639  box=0.0770  dir=0.6799  pos_anchor= 14  lr=1.90e-03  0.61s/it
+[step 0170/400] loss= 1.2322  cls=0.6517  box=0.2032  dir=0.8707  pos_anchor=  6  lr=1.84e-03  0.60s/it
+[step 0180/400] loss= 1.1144  cls=0.6024  box=0.1933  dir=0.6268  pos_anchor=  5  lr=1.77e-03  0.59s/it
+[step 0190/400] loss= 0.4517  cls=0.2649  box=0.0611  dir=0.3231  pos_anchor= 20  lr=1.70e-03  0.58s/it
+[step 0200/400] loss= 1.7185  cls=0.7383  box=0.4505  dir=0.3958  pos_anchor= 15  lr=1.61e-03  0.57s/it
+[step 0210/400] loss= 0.6448  cls=0.4071  box=0.0540  dir=0.6485  pos_anchor= 13  lr=1.52e-03  0.57s/it
+[step 0220/400] loss= 0.6796  cls=0.4482  box=0.0705  dir=0.4525  pos_anchor= 19  lr=1.42e-03  0.56s/it
+[step 0230/400] loss= 0.6990  cls=0.4588  box=0.0713  dir=0.4880  pos_anchor= 24  lr=1.32e-03  0.55s/it
+[step 0240/400] loss= 0.5043  cls=0.3387  box=0.0546  dir=0.2820  pos_anchor=  8  lr=1.21e-03  0.55s/it
+[step 0250/400] loss= 2.3662  cls=0.6578  box=0.8339  dir=0.2021  pos_anchor=  7  lr=1.10e-03  0.54s/it
+[step 0260/400] loss= 0.4198  cls=0.2682  box=0.0482  dir=0.2759  pos_anchor= 14  lr=9.89e-04  0.54s/it
+[step 0270/400] loss= 0.8901  cls=0.5791  box=0.1072  dir=0.4825  pos_anchor=  5  lr=8.77e-04  0.53s/it
+[step 0280/400] loss= 0.4306  cls=0.2987  box=0.0385  dir=0.2747  pos_anchor= 16  lr=7.67e-04  0.53s/it
+[step 0290/400] loss= 0.6177  cls=0.4141  box=0.0563  dir=0.4546  pos_anchor=  8  lr=6.59e-04  0.52s/it
+[step 0300/400] loss= 0.3568  cls=0.2325  box=0.0308  dir=0.3137  pos_anchor= 20  lr=5.56e-04  0.52s/it
+[step 0310/400] loss= 0.8320  cls=0.4979  box=0.1345  dir=0.3255  pos_anchor= 11  lr=4.59e-04  0.52s/it
+[step 0320/400] loss= 0.3360  cls=0.2214  box=0.0260  dir=0.3134  pos_anchor= 16  lr=3.68e-04  0.51s/it
+[step 0330/400] loss= 0.7217  cls=0.3707  box=0.1269  dir=0.4855  pos_anchor=  7  lr=2.85e-04  0.51s/it
+[step 0340/400] loss= 0.2752  cls=0.1658  box=0.0289  dir=0.2584  pos_anchor= 18  lr=2.11e-04  0.51s/it
+[step 0350/400] loss= 0.3886  cls=0.2222  box=0.0483  dir=0.3489  pos_anchor= 15  lr=1.47e-04  0.50s/it
+[step 0360/400] loss= 0.4128  cls=0.2315  box=0.0579  dir=0.3278  pos_anchor= 11  lr=9.42e-05  0.50s/it
+[step 0370/400] loss= 0.3520  cls=0.1953  box=0.0478  dir=0.3048  pos_anchor= 23  lr=5.25e-05  0.50s/it
+[step 0380/400] loss= 0.2192  cls=0.1221  box=0.0207  dir=0.2780  pos_anchor= 24  lr=2.26e-05  0.50s/it
+[step 0390/400] loss= 0.3941  cls=0.2158  box=0.0345  dir=0.5464  pos_anchor= 13  lr=5.10e-06  0.49s/it
+[step 0400/400] loss= 0.2513  cls=0.1520  box=0.0171  dir=0.3256  pos_anchor= 16  lr=7.09e-08  0.49s/it
+[eval] frame=18  TP=54 FP=5 FN=6  precision=0.92  recall=0.90
+  t=20.73s  car        skor=0.62  x= 11.7 y= -2.5  lwh=(4.5,1.8,1.6)  yaw=   5.7°
+  t=20.73s  car        skor=0.60  x= 10.7 y=  0.2  lwh=(4.4,1.9,1.6)  yaw= 177.4°
+  t=20.73s  car        skor=0.40  x=  8.1 y= -3.7  lwh=(4.5,1.8,1.6)  yaw=   0.2°
+  t=20.73s  car        skor=0.33  x=  8.3 y= -5.6  lwh=(4.4,1.8,1.6)  yaw= 177.6°
+[selesai] 198s  -> data/pointpillars_mini.pt
