@@ -1,3 +1,5 @@
+![Start Building, Creates more expert. — www.ai-idea.xyz · Burleigh LiDAR Lab](assets/banner.webp)
+
 # lindar-excercise-code
 
 Cara membuat dan memahami LiDAR serta cara kerjanya sebagai sensor di mobil otonom (automation). Materi edukasi:
